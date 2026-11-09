@@ -41,6 +41,8 @@ jobs:
         run: bun run lint
       - name: Navigation and catalogue tests
         run: bun test tests/navigation.test.ts tests/cms-security.test.ts tests/cms-data.test.ts tests/metadata.test.ts tests/catalog-queries.test.ts tests/bulk-csv.test.ts tests/seo-routes.test.ts tests/catalog-load.test.ts tests/import-recovery.test.ts tests/premium-storefront.test.ts tests/architecture-cms.test.ts tests/cms-auth-flow.test.ts tests/site-content.test.ts tests/editorial-catalogue-reviews.test.ts tests/social-footer-hygiene.test.ts tests/client-sku-handoff.test.ts
+      - name: Media optimization and multi-video catalogue tests
+        run: bun test tests/media-optimization.test.ts tests/multi-video-gallery.test.ts
       - name: Mobile/tablet layout regression contracts
         run: node --test tests/responsive-layout.test.mjs
       - name: Studio organization and media-scale regression contracts
