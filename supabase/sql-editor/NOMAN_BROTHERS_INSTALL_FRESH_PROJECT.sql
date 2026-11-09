@@ -22,6 +22,7 @@
 --    Those are required SEPARATE steps after this install.
 -- =============================================================================
 BEGIN;
+SET LOCAL search_path = public, extensions;
 SET LOCAL lock_timeout = '10s';
 
 -- Fail closed: never reinstall onto an already-initialized project.
