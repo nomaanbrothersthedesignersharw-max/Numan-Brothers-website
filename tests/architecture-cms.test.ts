@@ -9,6 +9,7 @@ const productStudio = readFileSync(new URL('../src/components/studio/CmsProducts
 const homepageStudio = readFileSync(new URL('../src/components/studio/CmsHomepage.tsx',import.meta.url),'utf8');
 const app = readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
 const main = readFileSync(new URL('../src/main.tsx',import.meta.url),'utf8');
+const studio = readFileSync(new URL('../src/components/CmsStudio.tsx',import.meta.url),'utf8');
 const sql = readFileSync(new URL('../supabase/migrations/20261107223000_category_media_publish_guard.sql',import.meta.url),'utf8');
 
 describe('Catalogue-only release architecture and CMS readiness',()=>{
@@ -22,6 +23,30 @@ describe('Catalogue-only release architecture and CMS readiness',()=>{
     expect(app).not.toContain('CartDrawer');
     expect(app).not.toContain('onPlaceOrder');
     expect(app).toContain('<CmsStudio/>');
+  });
+  test('keeps visited Studio editors mounted when switching between tabs',()=>{
+    expect(studio).toContain('visitedSections');
+    expect(studio).toContain("visitedSections.has('products')");
+    expect(studio).toContain("visitedSections.has('media')");
+    expect(studio).toContain("hidden={section!=='products'}");
+    expect(studio).toContain("hidden={section!=='media'}");
+    expect(studio).toContain('switchSection(item.id)');
+  });
+  test('creates an immediately persisted draft and debounces every field edit',()=>{
+    expect(productStudio).toContain('const persistDraft=useCallback');
+    expect(productStudio).toContain("setTimeout(()=>{void persistDraft(productId,snapshot);},650)");
+    expect(productStudio).toContain("client.from('nb_product_drafts').upsert");
+    expect(productStudio).toContain("setId(productId)");
+    expect(productStudio).toContain("void persistDraft(productId,fresh)");
+    expect(productStudio).toContain("const flushed=await persistDraft(currentId,latestFormRef.current)");
+    expect(productStudio).toContain('Auto-save failed');
+    expect(productStudio).toContain('Draft saved automatically');
+  });
+  test('product editor flushes the current draft before leaving or starting another product',()=>{
+    expect(productStudio).toContain('const backToList=async()=>');
+    expect(productStudio).toContain('const create=async()=>');
+    expect(productStudio).toContain('await persistDraft(currentId,latestFormRef.current)');
+    expect(productStudio).toContain('onClick={()=>void backToList()}');
   });
   test('does not reject old approved images when the 300-asset preview cache is incomplete',()=>{
     expect(productStudio).not.toContain('approvedImages.some(');

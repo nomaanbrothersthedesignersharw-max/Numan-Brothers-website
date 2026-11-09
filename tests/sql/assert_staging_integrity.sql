@@ -70,7 +70,23 @@ declare metrics record;
         blocked boolean := false;
 begin
   select * into metrics from public.nb_catalogue_health();
-  if metrics.published_products <> 1 or metrics.approved_assets <> 1 then
+  -- One approved image and one approved video are now both first-class media assets.
+  if not exists (
+    select 1 from pg_indexes where schemaname='public' and indexname='nb_products_video_urls_gin_idx'
+  ) or not exists (
+    select 1 from pg_indexes where schemaname='public' and indexname='nb_product_drafts_content_gin_idx'
+  ) then
+    raise exception 'Video reference lookup indexes are missing';
+  end if;
+
+  if not exists (
+    select 1 from pg_extension e join pg_namespace n on n.oid=e.extnamespace
+    where e.extname='pg_trgm' and n.nspname='extensions'
+  ) then
+    raise exception 'pg_trgm extension is not isolated in the extensions schema';
+  end if;
+
+  if metrics.published_products <> 1 or metrics.approved_assets <> 2 then
     raise exception 'Manager health metrics invalid';
   end if;
   if (select count(*) from public.nb_audit_events) < 2 then

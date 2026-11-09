@@ -1,4 +1,5 @@
 begin;
+set local search_path = public, extensions;
 -- Noman Brothers: production media lifecycle and indexed staff/media FKs.
 -- Forward-only, idempotent on the reviewed 14-migration base.
 -- Existing data is not seeded or deleted. Imported audit rows are retained,

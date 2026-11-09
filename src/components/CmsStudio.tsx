@@ -42,6 +42,11 @@ export default function CmsStudio(){
   const [password,setPassword]=useState('');
   const [signingIn,setSigningIn]=useState(false);
   const [section,setSection]=useState<Section>('dashboard');
+  const [visitedSections,setVisitedSections]=useState<Set<Section>>(()=>new Set(['dashboard']));
+  const switchSection=(next:Section)=>{
+    setVisitedSections(current=>current.has(next)?current:new Set([...current,next]));
+    setSection(next);
+  };
   const [stats,setStats]=useState<{published:number;drafts:number;assets:number;images:number;videos:number}|null>(null);
   const canPublish=canPublishRole(staff?.role);
 
@@ -137,6 +142,7 @@ export default function CmsStudio(){
     setAuthError(null);
     setPassword('');
     setSection('dashboard');
+    setVisitedSections(new Set(['dashboard']));
   };
   const refreshPermissions=async()=>{
     if(!client)return;
@@ -191,7 +197,7 @@ export default function CmsStudio(){
                  const item=sections.find(entry=>entry.id===id)!;
                  const Icon=item.icon;
                  return <button type="button" key={item.id}
-                   aria-current={section===item.id?'page':undefined} onClick={()=>setSection(item.id)}
+                   aria-current={section===item.id?'page':undefined} onClick={()=>switchSection(item.id)}
                    className={'flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-3 py-2.5 text-left text-xs sm:text-sm lg:gap-3 lg:px-4 '+
                      (section===item.id?'bg-[#d8bd93] font-semibold text-[#221c17]':'text-[#e2d4c3] hover:bg-[#3c3025]')}>
                    <Icon size={17}/>{item.label}</button>;
@@ -210,7 +216,7 @@ export default function CmsStudio(){
           <div className="sticky top-0 z-30 -mx-4 mb-5 border-b border-stone-200 bg-[#fbf8f2]/95 px-4 py-3 shadow-sm backdrop-blur-lg sm:-mx-6 sm:px-6 md:-mx-10 md:px-10 lg:hidden">
             <label className="flex min-w-0 items-center gap-3 text-xs font-semibold text-stone-700">
               <span className="shrink-0">Studio section</span>
-              <select aria-label="Switch Studio section" value={section} onChange={e=>setSection(e.target.value as Section)}
+              <select aria-label="Switch Studio section" value={section} onChange={e=>switchSection(e.target.value as Section)}
                 className={inputClass+' min-w-0 flex-1'}>
                 {sections.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
@@ -247,7 +253,7 @@ export default function CmsStudio(){
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29221b] text-xs font-semibold text-white">{index+1}</span>
                       <div><h4 className="text-sm font-semibold">{item.title}</h4>
                         <p className="mt-2 text-xs leading-6 text-stone-600">{item.detail}</p>
-                        <button type="button" onClick={()=>setSection(item.id)} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-800 underline underline-offset-4">
+                        <button type="button" onClick={()=>switchSection(item.id)} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-800 underline underline-offset-4">
                           Open {sections.find(section=>section.id===item.id)?.label} <ArrowUpRight size={13}/>
                         </button>
                       </div>
@@ -261,13 +267,24 @@ export default function CmsStudio(){
                 <p className="mt-2">Editors may save drafts and upload media. Only owners and admins can approve assets and publish changes. Public visitors can read only published catalogue content.</p>
               </div>
             </section>}
-            {section==='media'&&<CmsMedia client={client} userId={staff.id} canPublish={canPublish} onMediaChange={()=>void refreshStats()}/>}
-             {section==='imports'&&<CmsImports client={client} userId={staff.id} onMediaChange={()=>void refreshStats()}/>}
-
-            {section==='products'&&<CmsProducts client={client} userId={staff.id} canPublish={canPublish}/>}
-            {section==='homepage'&&<CmsHomepage client={client} userId={staff.id} canPublish={canPublish}/>}
-            {section==='collections'&&<CmsCategories client={client} canPublish={canPublish} userId={staff.id}/>}
-             {section==='reviews'&&<CmsReviews client={client} canPublish={canPublish}/>}
+            {visitedSections.has('media')&&<div hidden={section!=='media'} aria-hidden={section!=='media'}>
+              <CmsMedia client={client} userId={staff.id} canPublish={canPublish} onMediaChange={()=>void refreshStats()}/>
+            </div>}
+            {visitedSections.has('imports')&&<div hidden={section!=='imports'} aria-hidden={section!=='imports'}>
+              <CmsImports client={client} userId={staff.id} onMediaChange={()=>void refreshStats()}/>
+            </div>}
+            {visitedSections.has('products')&&<div hidden={section!=='products'} aria-hidden={section!=='products'}>
+              <CmsProducts client={client} userId={staff.id} canPublish={canPublish}/>
+            </div>}
+            {visitedSections.has('homepage')&&<div hidden={section!=='homepage'} aria-hidden={section!=='homepage'}>
+              <CmsHomepage client={client} userId={staff.id} canPublish={canPublish}/>
+            </div>}
+            {visitedSections.has('collections')&&<div hidden={section!=='collections'} aria-hidden={section!=='collections'}>
+              <CmsCategories client={client} canPublish={canPublish} userId={staff.id}/>
+            </div>}
+            {visitedSections.has('reviews')&&<div hidden={section!=='reviews'} aria-hidden={section!=='reviews'}>
+              <CmsReviews client={client} canPublish={canPublish}/>
+            </div>}
           </div>
         </main>
       </div>}

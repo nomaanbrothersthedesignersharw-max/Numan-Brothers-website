@@ -25,6 +25,8 @@ describe('Server-only media approval contract',()=>{
     assert.match(code,/from\('nb_categories'\)/);
     assert.match(code,/contains\('image_urls'/);
     assert.match(code,/eq\('video_url'/);
+    assert.match(code,/contains\('video_urls', \[publicUrl\]\)/);
+    assert.match(code,/contains\('content', \{videoUrls:\[publicUrl\]\}\)/);
     assert.match(code,/status', 'published'/);
     const references=code.indexOf("from('nb_product_media')");
     const revocation=code.indexOf('update({ approved: false })');

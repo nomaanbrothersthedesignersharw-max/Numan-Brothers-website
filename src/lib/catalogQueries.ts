@@ -3,7 +3,7 @@ import { COLLECTION_ROUTES } from '../storefront/navigation';
 import { getCmsClient } from './supabaseClient';
 import { rowToProduct, type CmsProductRow } from './cmsData';
 
-const columns = 'id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,price,offer_price,customizable,status,sort_rank,created_at,updated_at';
+const columns = 'id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,video_urls,price,offer_price,customizable,status,sort_rank,created_at,updated_at';
 export const PUBLIC_PAGE_SIZE = 24;
 export interface CataloguePage {
   products: CatalogProduct[];

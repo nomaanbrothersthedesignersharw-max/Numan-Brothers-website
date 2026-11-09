@@ -1,7 +1,7 @@
 -- =============================================================================
 -- NOMAN BROTHERS - EXISTING TABLES COMPLETION (NON-DESTRUCTIVE RECONCILIATION)
 -- Target: NEW/OTHER SUPABASE ACCOUNT where all 15 nb_ tables already exist.
--- Generated from the project's 14 base migrations, Phase 2 lifecycle guards and\n-- scalable index additions. Existing table rows are preserved.
+-- Generated from all twenty-one reviewed versioned migrations in dependency order.\n-- Existing table rows are preserved; do not run on a fresh project.
 -- Never run original fresh-project installer on these existing tables.
 -- Does not deploy Edge Functions or migrate Auth users / Storage objects.
 -- Review target project in Supabase Dashboard before running.
@@ -11,6 +11,7 @@
 -- Not a substitute for audit of target data or live role/storage smoke tests.
 -- =============================================================================
 BEGIN;
+SET LOCAL search_path = public, extensions;
 SET LOCAL lock_timeout = '10s';
 SET LOCAL statement_timeout = '120s';
 DO $nb_existing_check$
@@ -38,7 +39,7 @@ END
 $nb_existing_check$;
 
 -- =============================================================================
--- 1 / 9: 20261107060000_nomaan_cms.sql
+-- 1 / 21: 20261107060000_nomaan_cms.sql
 -- Source: supabase/migrations/20261107060000_nomaan_cms.sql
 -- =============================================================================
 -- Nomaan Brothers CMS: isolated, fail-closed schema. Apply ONLY to a dedicated
@@ -617,7 +618,7 @@ insert into public.nb_categories (path, department, label, sort_order) values
 on conflict (path) do nothing;
 
 -- =============================================================================
--- 2 / 9: 20261107130000_catalogue_private_media.sql
+-- 2 / 21: 20261107130000_catalogue_private_media.sql
 -- Source: supabase/migrations/20261107130000_catalogue_private_media.sql
 -- =============================================================================
 -- Phase 2: catalogue associations, indexed search, private upload staging.
@@ -800,7 +801,7 @@ create index IF NOT EXISTS nb_products_published_page_idx on public.nb_products
   (department, updated_at desc, id) where status='published';
 
 -- =============================================================================
--- 3 / 9: 20261107150000_studio_product_index.sql
+-- 3 / 21: 20261107150000_studio_product_index.sql
 -- Source: supabase/migrations/20261107150000_studio_product_index.sql
 -- =============================================================================
 -- Phase 3: stable, server-side searchable catalogue index for the staff CMS.
@@ -830,7 +831,7 @@ revoke all on public.nb_studio_product_index from public,anon,authenticated;
 grant select on public.nb_studio_product_index to authenticated;
 
 -- =============================================================================
--- 4 / 9: 20261107170000_bulk_import_jobs.sql
+-- 4 / 21: 20261107170000_bulk_import_jobs.sql
 -- Source: supabase/migrations/20261107170000_bulk_import_jobs.sql
 -- =============================================================================
 -- Phase 4: resumable audit-friendly catalogue onboarding jobs.
@@ -921,7 +922,7 @@ create policy nb_import_rows_owner_update on public.nb_import_rows for update to
   ));
 
 -- =============================================================================
--- 5 / 9: 20261107172000_match_approved_media.sql
+-- 5 / 21: 20261107172000_match_approved_media.sql
 -- Source: supabase/migrations/20261107172000_match_approved_media.sql
 -- =============================================================================
 -- Server-side SKU matching for approved assets. Never overwrites a manual
@@ -989,7 +990,7 @@ revoke all on function public.nb_link_approved_media(uuid,integer) from public,a
 grant execute on function public.nb_link_approved_media(uuid,integer) to authenticated;
 
 -- =============================================================================
--- 6 / 9: 20261107195000_studio_index_role_gate.sql
+-- 6 / 21: 20261107195000_studio_index_role_gate.sql
 -- Source: supabase/migrations/20261107195000_studio_index_role_gate.sql
 -- =============================================================================
 -- Phase 6: the public product RLS policy alone is not sufficient to
@@ -1019,7 +1020,7 @@ revoke all on public.nb_studio_product_index from public,anon,authenticated;
 grant select on public.nb_studio_product_index to authenticated;
 
 -- =============================================================================
--- 7 / 9: 20261107199000_import_owner_idempotency.sql
+-- 7 / 21: 20261107199000_import_owner_idempotency.sql
 -- Source: supabase/migrations/20261107199000_import_owner_idempotency.sql
 -- =============================================================================
 -- Phase 6 reconciliation: imported files must be scoped to their uploader.
@@ -1033,7 +1034,7 @@ create unique index if not exists nb_import_jobs_owner_fingerprint_uq
   on public.nb_import_jobs(created_by, import_key);
 
 -- =============================================================================
--- 8 / 9: 20261107210000_catalogue_integrity_audit.sql
+-- 8 / 21: 20261107210000_catalogue_integrity_audit.sql
 -- Source: supabase/migrations/20261107210000_catalogue_integrity_audit.sql
 -- =============================================================================
 -- Noman Brothers: production-candidate catalogue integrity and audit controls.
@@ -1223,7 +1224,7 @@ revoke all on function public.nb_catalogue_health() from public, anon, authentic
 grant execute on function public.nb_catalogue_health() to authenticated;
 
 -- =============================================================================
--- 9 / 10: 20261107223000_category_media_publish_guard.sql
+-- 9 / 21: 20261107223000_category_media_publish_guard.sql
 -- Source: supabase/migrations/20261107223000_category_media_publish_guard.sql
 -- =============================================================================
 -- Prevent bypassing the approved-media library when changing a public
@@ -1258,7 +1259,7 @@ create trigger nb_category_image_approval_guard
 
 -- =============================================================================
 -- =============================================================================
--- 10 / 12: 20261107234500_cms_archive_and_discard.sql
+-- 10 / 21: 20261107234500_cms_archive_and_discard.sql
 -- Source: supabase/migrations/20261107234500_cms_archive_and_discard.sql
 -- =============================================================================
 -- Forward-only CMS inventory operations: archive products and discard drafts.
@@ -1292,7 +1293,7 @@ for delete to authenticated using (
 
 -- =============================================================================
 -- =============================================================================
--- 11 / 12: 20261107235900_catalogue_media_merchandising.sql
+-- 11 / 21: 20261107235900_catalogue_media_merchandising.sql
 -- Source: supabase/migrations/20261107235900_catalogue_media_merchandising.sql
 -- =============================================================================
 -- Noman Brothers catalog merchandising and media organisation. Forward-only.
@@ -1562,7 +1563,7 @@ where path in ('/men/tope','/kids/tope','/men/marriage/jutti',
                '/men/marriage/sadi','/kids/sadi');
 
 -- =============================================================================
--- 12 / 12: 20261108001500_home_media_security.sql
+-- 12 / 21: 20261108001500_home_media_security.sql
 -- Source: supabase/migrations/20261108001500_home_media_security.sql
 -- =============================================================================
 -- Guard optional website CMS video/background assets during publish and archive.
@@ -1706,7 +1707,7 @@ end;
 $function$;
 
 -- =============================================================================
--- 13 / 13: 20261109113800_site_reviews.sql
+-- 13 / 21: 20261109113800_site_reviews.sql
 -- Source: supabase/migrations/20261109113800_site_reviews.sql
 -- =============================================================================
 -- Only owner-approved, first-party reviews are displayed. No scraped testimonials.
@@ -1772,7 +1773,7 @@ create trigger nb_review_approval_stamp before update on public.nb_reviews
 revoke all on function public.nb_stamp_review_approval() from public,anon,authenticated;
 
 -- =============================================================================
--- 14 / 14: 20261109120000_featured_media_guard.sql
+-- 14 / 21: 20261109120000_featured_media_guard.sql
 -- Source: supabase/migrations/20261109120000_featured_media_guard.sql
 -- =============================================================================
 -- Additional CMS hero/card imagery must belong to an approved public asset.
@@ -1854,6 +1855,61 @@ WHERE id='nb-media-public';
 
 -- Validate the installation BEFORE committing it. Failure rolls back all 14.
 -- =============================================================================
+-- =============================================================================
+-- 20 / 21: 20261109230000_move_pg_trgm_extension.sql
+-- Source: supabase/migrations/20261109230000_move_pg_trgm_extension.sql
+-- =============================================================================
+CREATE SCHEMA IF NOT EXISTS extensions;
+-- Supabase recommends keeping extensions outside the exposed public schema.
+-- pg_trgm is relocatable; moving its objects does not rebuild or drop the
+-- existing GIN indexes. This is safe for an already-populated catalogue.
+DO $move_pg_trgm$
+DECLARE current_schema text;
+BEGIN
+  SELECT n.nspname INTO current_schema
+  FROM pg_extension e
+  JOIN pg_namespace n ON n.oid=e.extnamespace
+  WHERE e.extname='pg_trgm';
+
+  IF current_schema IS NULL THEN
+    RAISE EXCEPTION 'pg_trgm extension is required by the catalogue indexes';
+  ELSIF current_schema='public' THEN
+    -- The schema is created above for local PostgreSQL test parity.
+    EXECUTE 'ALTER EXTENSION pg_trgm SET SCHEMA extensions';
+  ELSIF current_schema <> 'extensions' THEN
+    RAISE EXCEPTION 'pg_trgm is installed in unexpected schema: %', current_schema;
+  END IF;
+END
+$move_pg_trgm$;
+
+DO $assert_pg_trgm$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_extension e
+    JOIN pg_namespace n ON n.oid=e.extnamespace
+    WHERE e.extname='pg_trgm' AND n.nspname='extensions'
+  ) THEN
+    RAISE EXCEPTION 'pg_trgm was not moved into the extensions schema';
+  END IF;
+END
+$assert_pg_trgm$;
+
+-- =============================================================================
+-- 21 / 21: 20261109233000_video_gallery_lookup_indexes.sql
+-- Source: supabase/migrations/20261109233000_video_gallery_lookup_indexes.sql
+-- =============================================================================
+-- Fast reference checks when a video asset is being removed or replaced.
+-- Both PostgREST contains() lookups use PostgreSQL @> operators, supported
+-- by these GIN indexes (array_ops and jsonb_path_ops respectively).
+CREATE INDEX IF NOT EXISTS nb_products_video_urls_gin_idx
+  ON public.nb_products USING gin (video_urls);
+
+CREATE INDEX IF NOT EXISTS nb_product_drafts_content_gin_idx
+  ON public.nb_product_drafts USING gin (content jsonb_path_ops);
+
+ANALYZE public.nb_products;
+ANALYZE public.nb_product_drafts;
+
 DO $nb_install_assert$
 DECLARE
   expected_tables text[] := ARRAY[
@@ -2193,7 +2249,303 @@ end;
 $checks$;
 
 -- =============================================================================
--- 17 / 17: 20261109210000_sku_counter_least_privilege.sql
+-- 15 / 21: 20261109190000_media_lifecycle_scale_indexes.sql
+-- Source: supabase/migrations/20261109190000_media_lifecycle_scale_indexes.sql
+-- =============================================================================
+set local search_path = public, extensions;
+-- Noman Brothers: production media lifecycle and indexed staff/media FKs.
+-- Forward-only, idempotent on the reviewed 14-migration base.
+-- Existing data is not seeded or deleted. Imported audit rows are retained,
+-- with media_id set NULL when an otherwise unreferenced asset is removed.
+-- Run via Supabase migration tooling or the updated SQL Editor fresh installer.
+
+-- Stop immediately if this is not the installed Noman Brothers CMS schema.
+DO $preflight$
+BEGIN
+  IF to_regclass('public.nb_media') IS NULL
+     OR to_regclass('public.nb_product_media') IS NULL
+     OR to_regclass('public.nb_products') IS NULL
+     OR to_regclass('public.nb_product_drafts') IS NULL
+     OR to_regclass('public.nb_categories') IS NULL
+     OR to_regclass('public.nb_home_public') IS NULL
+     OR to_regclass('public.nb_home_drafts') IS NULL
+     OR to_regclass('public.nb_import_rows') IS NULL
+     OR to_regclass('public.nb_sku_counters') IS NULL
+     OR to_regclass('public.nb_reviews') IS NULL
+     OR to_regnamespace('nb_internal') IS NULL
+     OR NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id='nb-media-staging' AND public = false)
+     OR NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id='nb-media-public' AND public = true)
+  THEN
+    RAISE EXCEPTION 'Noman CMS base installation is incomplete; run the 14-migration fresh installer FIRST';
+  END IF;
+END
+$preflight$;
+
+-- Uploaded paths exactly match src/lib/cmsUpload.ts: user-uuid/object-uuid.ext.
+-- This also keeps lifecycle reference checks unambiguous. For a populated
+-- legacy project, audit existing paths BEFORE attempting this constraint.
+DO $path_check$
+BEGIN
+ IF NOT EXISTS (
+   SELECT 1 FROM pg_constraint
+   WHERE conrelid='public.nb_media'::regclass AND conname='nb_media_managed_path_format'
+ ) THEN
+   ALTER TABLE public.nb_media
+     ADD CONSTRAINT nb_media_managed_path_format CHECK (
+       storage_path ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|avif|gif|mp4|webm)$'
+       AND split_part(storage_path,'/',1) = uploaded_by::text
+     );
+ END IF;
+END
+$path_check$;
+
+CREATE INDEX IF NOT EXISTS nb_media_archive_recent_idx
+  ON public.nb_media (archived_at, created_at DESC, id DESC);
+
+-- Keep import history intact if an otherwise unused media asset is truly
+-- deleted. Otherwise the original ON DELETE RESTRICT FK makes the Edge
+-- Function fail at its FINAL database delete, after Storage objects are gone.
+-- media_id is optional on import history rows; null means asset was removed.
+ALTER TABLE public.nb_import_rows
+  DROP CONSTRAINT IF EXISTS nb_import_rows_media_id_fkey;
+ALTER TABLE public.nb_import_rows
+  ADD CONSTRAINT nb_import_rows_media_id_fkey
+  FOREIGN KEY (media_id) REFERENCES public.nb_media(id) ON DELETE SET NULL;
+
+-- Server-side protection, independently enforced for privileged writes.
+-- Covers live & archived product associations, direct product URLs, category
+-- covers, published homepage, SAVED homepage/product drafts and new featured
+-- cards, customization banner and per-section videos. Approval revocation,
+-- archiving and metadata deletion are rejected until links are removed.
+CREATE OR REPLACE FUNCTION nb_internal.nb_guard_media_lifecycle()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $guard$
+DECLARE
+  suffix text := '/nb-media-public/' || OLD.storage_path;
+  content_keys text[] := ARRAY[
+    'heroImage','menImage','kidsImage','storyImage','customizationImage'
+  ];
+BEGIN
+  IF TG_OP='UPDATE' THEN
+    -- Restore, label edits or approval do not remove a usable asset.
+    IF NOT (
+      (OLD.approved = true AND NEW.approved = false)
+      OR (OLD.archived_at IS DISTINCT FROM NEW.archived_at
+          AND NEW.archived_at IS NOT NULL)
+    ) THEN
+      RETURN NEW;
+    END IF;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.nb_product_media pm WHERE pm.media_id=OLD.id
+  ) OR EXISTS (
+    SELECT 1 FROM public.nb_products p
+    WHERE right(coalesce(p.video_url,''), length(suffix))=suffix
+       OR EXISTS (
+         SELECT 1 FROM unnest(p.image_urls) AS photo(url)
+         WHERE right(coalesce(photo.url,''), length(suffix))=suffix
+       )
+  ) OR EXISTS (
+    SELECT 1 FROM public.nb_categories c
+    WHERE right(coalesce(c.image_url,''), length(suffix))=suffix
+  ) OR EXISTS (
+    SELECT 1 FROM public.nb_product_drafts d
+    WHERE right(coalesce(d.content->>'videoUrl',''), length(suffix))=suffix
+       OR EXISTS (
+         SELECT 1 FROM jsonb_array_elements_text(
+           CASE WHEN jsonb_typeof(d.content->'imageUrls')='array'
+                THEN d.content->'imageUrls' ELSE '[]'::jsonb END
+         ) AS photo(url)
+         WHERE right(coalesce(photo.url,''), length(suffix))=suffix
+       )
+  ) OR EXISTS (
+    SELECT 1 FROM public.nb_home_public h
+    WHERE EXISTS (
+      SELECT 1 FROM unnest(content_keys) AS k(field_name)
+      WHERE right(coalesce(h.content->>k.field_name,''), length(suffix))=suffix
+    ) OR EXISTS (
+      SELECT 1 FROM jsonb_each_text(
+        CASE WHEN jsonb_typeof(h.content->'sectionVideos')='object'
+          THEN h.content->'sectionVideos' ELSE '{}'::jsonb END
+      ) AS v(key,url)
+      WHERE right(coalesce(v.url,''), length(suffix))=suffix
+    ) OR EXISTS (
+      SELECT 1 FROM jsonb_each_text(
+        CASE WHEN jsonb_typeof(h.content->'featuredImages')='object'
+          THEN h.content->'featuredImages' ELSE '{}'::jsonb END
+      ) AS f(key,url)
+      WHERE right(coalesce(f.url,''), length(suffix))=suffix
+    )
+  ) OR EXISTS (
+    SELECT 1 FROM public.nb_home_drafts d
+    WHERE EXISTS (
+      SELECT 1 FROM unnest(content_keys) AS k(field_name)
+      WHERE right(coalesce(d.content->>k.field_name,''), length(suffix))=suffix
+    ) OR EXISTS (
+      SELECT 1 FROM jsonb_each_text(
+        CASE WHEN jsonb_typeof(d.content->'sectionVideos')='object'
+          THEN d.content->'sectionVideos' ELSE '{}'::jsonb END
+      ) AS v(key,url)
+      WHERE right(coalesce(v.url,''), length(suffix))=suffix
+    ) OR EXISTS (
+      SELECT 1 FROM jsonb_each_text(
+        CASE WHEN jsonb_typeof(d.content->'featuredImages')='object'
+          THEN d.content->'featuredImages' ELSE '{}'::jsonb END
+      ) AS f(key,url)
+      WHERE right(coalesce(f.url,''), length(suffix))=suffix
+    )
+  ) THEN
+    RAISE EXCEPTION
+      'Media is still referenced by a product, collection, published page or saved draft. Unlink and save/publish its replacement first.'
+      USING ERRCODE='23503';
+  END IF;
+
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END
+$guard$;
+
+REVOKE ALL ON FUNCTION nb_internal.nb_guard_media_lifecycle()
+  FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS nb_media_lifecycle_update_guard ON public.nb_media;
+CREATE TRIGGER nb_media_lifecycle_update_guard
+  BEFORE UPDATE OF approved, archived_at ON public.nb_media
+  FOR EACH ROW EXECUTE FUNCTION nb_internal.nb_guard_media_lifecycle();
+
+DROP TRIGGER IF EXISTS nb_media_lifecycle_delete_guard ON public.nb_media;
+CREATE TRIGGER nb_media_lifecycle_delete_guard
+  BEFORE DELETE ON public.nb_media
+  FOR EACH ROW EXECUTE FUNCTION nb_internal.nb_guard_media_lifecycle();
+
+-- No client-side hard deletes. Only privileged Edge Function service client
+-- may delete metadata once its Storage files have been reconciled.
+REVOKE DELETE ON public.nb_media FROM PUBLIC, anon, authenticated;
+
+-- The original 14 migrations already create all the required media/storage
+-- buckets, publishing RPCs, catalogue tables and RLS. Do NOT duplicate them.
+DO $assert$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid='public.nb_media'::regclass
+      AND tgname='nb_media_lifecycle_delete_guard' AND NOT tgisinternal
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgrelid='public.nb_media'::regclass
+      AND tgname='nb_media_lifecycle_update_guard' AND NOT tgisinternal
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid='public.nb_import_rows'::regclass
+      AND conname='nb_import_rows_media_id_fkey' AND confdeltype='n'
+  ) THEN
+    RAISE EXCEPTION 'Phase 2 lifecycle safeguards were not completely installed';
+  END IF;
+END
+$assert$;
+
+-- Supabase Performance Advisor: cover eight FK columns used in lookups,
+-- staff audits, and clean-up. No full table rewrite or data deletion.
+CREATE INDEX IF NOT EXISTS nb_home_drafts_updated_by_fk_idx
+  ON public.nb_home_drafts (updated_by);
+CREATE INDEX IF NOT EXISTS nb_home_public_published_by_fk_idx
+  ON public.nb_home_public (published_by);
+CREATE INDEX IF NOT EXISTS nb_home_revisions_published_by_fk_idx
+  ON public.nb_home_revisions (published_by);
+CREATE INDEX IF NOT EXISTS nb_import_rows_media_id_fk_idx
+  ON public.nb_import_rows (media_id);
+CREATE INDEX IF NOT EXISTS nb_media_uploaded_by_fk_idx
+  ON public.nb_media (uploaded_by);
+CREATE INDEX IF NOT EXISTS nb_product_drafts_updated_by_fk_idx
+  ON public.nb_product_drafts (updated_by);
+CREATE INDEX IF NOT EXISTS nb_product_revisions_published_by_fk_idx
+  ON public.nb_product_revisions (published_by);
+CREATE INDEX IF NOT EXISTS nb_products_created_by_fk_idx
+  ON public.nb_products (created_by);
+
+-- Supabase Advisor confirmed these two had identical columns and order.
+-- Keep the 'changed' index, drop the unused duplicate 'recent' index.
+DROP INDEX IF EXISTS public.nb_product_drafts_recent_idx;
+
+-- =============================================================================
+-- 16 / 21: 20261109194500_client_sku_handoff.sql
+-- Source: supabase/migrations/20261109194500_client_sku_handoff.sql
+-- =============================================================================
+-- Client-handoff compatibility: one authoritative database, category taxonomy,
+-- immutable published garment SKU and batched auto-SKU reservation.
+-- Historical published products and existing serial counters are preserved.
+
+update public.nb_categories
+  set label='Plain Sherwani'
+where path='/men/sherwani/plain' and label is distinct from 'Plain Sherwani';
+
+-- An NB-SH-00001 SKU is a permanent business identifier. Changing a public
+-- product's SKU would strand existing photo filenames, CSV references and
+-- customer searches. Titles, descriptions, categories, images and price can
+-- still be edited by publishing a new version with the same SKU.
+create or replace function nb_internal.nb_keep_published_sku()
+returns trigger language plpgsql security invoker set search_path=''
+as $sku_identity$
+begin
+  if old.sku is distinct from new.sku then
+    raise exception 'This product SKU is permanent. Create a new garment for a different SKU.'
+      using errcode='23514';
+  end if;
+  return new;
+end;
+$sku_identity$;
+revoke all on function nb_internal.nb_keep_published_sku() from public,anon,authenticated;
+drop trigger if exists nb_keep_published_sku on public.nb_products;
+create trigger nb_keep_published_sku
+  before update of sku on public.nb_products
+  for each row execute function nb_internal.nb_keep_published_sku();
+
+-- Batch import can reserve up to 100 serial IDs in one authenticated RPC;
+-- nb_next_sku locks the per-garment counter through INSERT ON CONFLICT UPDATE.
+-- Counter gaps after abandoned drafts are safe; SKUs are never reused.
+create or replace function public.nb_reserve_skus(p_category_path text,p_count integer)
+returns text[] language plpgsql security invoker set search_path=''
+as $reserve$
+declare
+  result text[] := '{}';
+  i integer;
+begin
+  if not (select public.nb_can_edit()) then
+    raise exception 'Staff access required' using errcode='42501';
+  end if;
+  if p_count is null or p_count < 1 or p_count > 100 then
+    raise exception 'Reserve 1 to 100 products at a time' using errcode='22023';
+  end if;
+  for i in 1..p_count loop
+    result := array_append(result,public.nb_next_sku(p_category_path));
+  end loop;
+  return result;
+end;
+$reserve$;
+revoke all on function public.nb_reserve_skus(text,integer) from public,anon,authenticated;
+grant execute on function public.nb_reserve_skus(text,integer) to authenticated;
+
+-- Sanity check that a garment's SKU counter is still restricted to staff.
+do $checks$
+begin
+  if not exists(
+    select 1 from pg_policies
+    where schemaname='public' and tablename='nb_sku_counters'
+  ) or not exists(
+    select 1 from pg_trigger where tgrelid='public.nb_products'::regclass
+      and tgname='nb_keep_published_sku' and not tgisinternal
+  ) then
+    raise exception 'SKU role gate or identity guard is missing';
+  end if;
+end;
+$checks$;
+
+-- =============================================================================
+-- 17 / 21: 20261109210000_sku_counter_least_privilege.sql
 -- Source: supabase/migrations/20261109210000_sku_counter_least_privilege.sql
 -- =============================================================================
 -- SKU counters are written only through the staff-gated reservation flow.
@@ -2243,7 +2595,7 @@ END
 $sku_acl_assert$;
 
 -- =============================================================================
--- 18 / 18: 20261109213000_consolidate_cms_rls_policies.sql
+-- 18 / 21: 20261109213000_consolidate_cms_rls_policies.sql
 -- Source: supabase/migrations/20261109213000_consolidate_cms_rls_policies.sql
 -- =============================================================================
 -- Preserve the existing OR semantics while avoiding multiple permissive
@@ -2323,6 +2675,329 @@ BEGIN
   END IF;
 END
 $policy_assert$;
+
+-- =============================================================================
+-- 19 / 21: 20261109220000_multi_video_gallery.sql
+-- Source: supabase/migrations/20261109220000_multi_video_gallery.sql
+-- =============================================================================
+-- Add a first-class, bounded video gallery while keeping video_url as the
+-- compatibility field for older storefront clients and SEO consumers.
+ALTER TABLE public.nb_products
+  ADD COLUMN IF NOT EXISTS video_urls text[] NOT NULL DEFAULT '{}';
+
+DO $video_constraint$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid='public.nb_products'::regclass
+      AND conname='nb_products_video_urls_limit'
+  ) THEN
+    ALTER TABLE public.nb_products
+      ADD CONSTRAINT nb_products_video_urls_limit
+      CHECK (
+        cardinality(video_urls) <= 200
+        AND array_to_string(video_urls,' ') !~* '(javascript:|data:|file:|<)'
+      );
+  END IF;
+END
+$video_constraint$;
+
+create or replace function public.nb_publish_product(p_product_id uuid)
+returns integer language plpgsql security invoker set search_path = ''
+as $$
+declare
+  draft jsonb;
+  next_version integer;
+  paths text[];
+  photos text[];
+  sizes_value text[];
+  product_sku text;
+  product_slug text;
+  product_title text;
+  product_dept text;
+  product_video text;
+  product_videos text[];
+  product_price numeric;
+  product_offer numeric;
+  product_customizable boolean;
+begin
+  if not public.nb_can_publish() then
+    raise exception 'Not authorized to publish' using errcode = '42501';
+  end if;
+  perform set_config('app.nb_publish_scope','product',true);
+  select content into draft from public.nb_product_drafts
+    where product_id = p_product_id for update;
+  if not found then
+    raise exception 'Save a product draft before publishing';
+  end if;
+  product_sku := trim(coalesce(draft->>'sku',''));
+  product_slug := trim(coalesce(draft->>'slug',''));
+  product_title := trim(coalesce(draft->>'title',''));
+  product_dept := coalesce(draft->>'department','');
+  product_video := nullif(trim(coalesce(draft->>'videoUrl','')), '');
+  if jsonb_typeof(coalesce(draft->'videoUrls','[]'::jsonb)) <> 'array' then
+    raise exception 'Video gallery must be an array';
+  end if;
+  select coalesce(array_agg(url order by ordinal), '{}') into product_videos
+    from (
+      select distinct on (url) url, ordinal
+      from (
+        select trim(value) as url, ordinal::integer as ordinal
+        from jsonb_array_elements_text(coalesce(draft->'videoUrls','[]'::jsonb))
+          with ordinality as entries(value,ordinal)
+        union all
+        select product_video, 0 where product_video is not null
+      ) as candidates
+      where url is not null and url <> ''
+      order by url,ordinal
+    ) as videos;
+  if cardinality(product_videos) > 200 then
+    raise exception 'A product can contain at most 200 video links';
+  end if;
+  if exists(select 1 from unnest(product_videos) as item(url) where url !~ '^https://') then
+    raise exception 'Every product video must use HTTPS';
+  end if;
+  if exists (
+    select 1 from unnest(product_videos) as item(url)
+    where position('/storage/v1/object/public/nb-media-public/' in url)>0
+      and not exists (
+        select 1 from public.nb_media m
+        where m.approved and m.mime_type like 'video/%'
+          and url=public.nb_media_public_url(m.storage_path)
+      )
+  ) then
+    raise exception 'Product videos must be approved video assets from this Media library';
+  end if;
+  product_video := coalesce(product_video, product_videos[1]);
+  if length(product_title) < 2 or length(product_title) > 180
+    or length(product_sku) < 2 or length(product_sku) > 80
+    or product_slug !~ '^[a-z0-9]+(-[a-z0-9]+)*$'
+    or product_dept not in ('men','kids') then
+    raise exception 'Invalid SKU, title, slug or department';
+  end if;
+  if jsonb_typeof(draft->'categoryPaths') <> 'array'
+    or jsonb_typeof(draft->'imageUrls') <> 'array'
+    or jsonb_typeof(coalesce(draft->'sizes','[]'::jsonb)) <> 'array' then
+    raise exception 'Invalid product category or image list';
+  end if;
+  select coalesce(array_agg(val), '{}') into paths
+    from jsonb_array_elements_text(draft->'categoryPaths') as vals(val);
+  select coalesce(array_agg(val), '{}') into photos
+    from jsonb_array_elements_text(draft->'imageUrls') as vals(val);
+  select coalesce(array_agg(val), '{}') into sizes_value
+    from jsonb_array_elements_text(coalesce(draft->'sizes','[]'::jsonb)) as vals(val);
+  if cardinality(paths) = 0 or cardinality(photos) = 0 then
+    raise exception 'Choose a collection and at least one approved image';
+  end if;
+  if exists (
+    select 1 from unnest(paths) as routes(route)
+    where not exists (
+      select 1 from public.nb_categories c
+      where c.path = route and c.active and c.department = product_dept
+    )
+  ) then
+    raise exception 'A category is inactive, invalid or in the wrong department';
+  end if;
+  if exists (
+    select 1 from unnest(photos) as photos_input(photo)
+    where not exists (
+      select 1 from public.nb_media m
+      where m.approved and photo = public.nb_media_public_url(m.storage_path)
+    )
+  ) then
+    raise exception 'Publish images from the approved media library only';
+  end if;
+  if product_video is not null and product_video !~ '^https://' then
+    raise exception 'Videos must use HTTPS';
+  end if;
+  product_price := nullif(draft->>'price','')::numeric;
+  product_offer := nullif(draft->>'offerPrice','')::numeric;
+  product_customizable := coalesce((draft->>'customizable')::boolean,false);
+  if product_price is not null and product_price < 0 then
+    raise exception 'Price cannot be negative';
+  end if;
+  if product_offer is not null and (product_price is null or product_offer < 0 or product_offer >= product_price) then
+    raise exception 'Offer price must be non-negative and lower than the original price';
+  end if;
+  insert into public.nb_products (
+    id,sku,slug,title,department,category_paths,description,fabric,sizes,
+    image_urls,video_url,video_urls,price,offer_price,customizable,status,sort_rank,published_at,created_by
+  ) values (
+    p_product_id,product_sku,product_slug,product_title,product_dept,paths,
+    coalesce(draft->>'description',''),coalesce(draft->>'fabric',''),sizes_value,
+    photos,product_video,product_videos,product_price,product_offer,product_customizable,'published',
+    coalesce((draft->>'sortRank')::integer,0),now(),auth.uid()
+  )
+  on conflict (id) do update set
+    sku = excluded.sku, slug = excluded.slug, title = excluded.title,
+    department = excluded.department, category_paths = excluded.category_paths,
+    description = excluded.description, fabric = excluded.fabric,
+    sizes = excluded.sizes, image_urls = excluded.image_urls,
+    video_url = excluded.video_url, video_urls = excluded.video_urls, price = excluded.price,
+    offer_price = excluded.offer_price, customizable = excluded.customizable,
+    status = 'published', sort_rank = excluded.sort_rank, published_at = now();
+  select coalesce(max(version),0)+1 into next_version
+    from public.nb_product_revisions where product_id = p_product_id;
+  insert into public.nb_product_revisions(product_id,version,content,published_by)
+    values (p_product_id,next_version,draft,auth.uid());
+  perform set_config('app.nb_publish_scope','',true);
+  return next_version;
+end;
+$$;
+
+CREATE OR REPLACE FUNCTION nb_internal.nb_guard_media_lifecycle()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $guard$
+DECLARE
+  suffix text := '/nb-media-public/' || OLD.storage_path;
+  content_keys text[] := ARRAY[
+    'heroImage','menImage','kidsImage','storyImage','customizationImage'
+  ];
+BEGIN
+  IF TG_OP='UPDATE' THEN
+    -- Restore, label edits or approval do not remove a usable asset.
+    IF NOT (
+      (OLD.approved = true AND NEW.approved = false)
+      OR (OLD.archived_at IS DISTINCT FROM NEW.archived_at
+          AND NEW.archived_at IS NOT NULL)
+    ) THEN
+      RETURN NEW;
+    END IF;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.nb_product_media pm WHERE pm.media_id=OLD.id
+  ) OR EXISTS (
+    SELECT 1 FROM public.nb_products p
+    WHERE right(coalesce(p.video_url,''), length(suffix))=suffix
+       OR EXISTS (
+         SELECT 1 FROM unnest(coalesce(p.video_urls,'{}'::text[])) AS video(url)
+         WHERE right(coalesce(video.url,''), length(suffix))=suffix
+       )
+       OR EXISTS (
+         SELECT 1 FROM unnest(p.image_urls) AS photo(url)
+         WHERE right(coalesce(photo.url,''), length(suffix))=suffix
+       )
+  ) OR EXISTS (
+    SELECT 1 FROM public.nb_categories c
+    WHERE right(coalesce(c.image_url,''), length(suffix))=suffix
+  ) OR EXISTS (
+    SELECT 1 FROM public.nb_product_drafts d
+    WHERE right(coalesce(d.content->>'videoUrl',''), length(suffix))=suffix
+       OR EXISTS (
+         SELECT 1 FROM jsonb_array_elements_text(
+           CASE WHEN jsonb_typeof(d.content->'videoUrls')='array'
+                THEN d.content->'videoUrls' ELSE '[]'::jsonb END
+         ) AS video(url)
+         WHERE right(coalesce(video.url,''), length(suffix))=suffix
+       )
+       OR EXISTS (
+         SELECT 1 FROM jsonb_array_elements_text(
+           CASE WHEN jsonb_typeof(d.content->'imageUrls')='array'
+                THEN d.content->'imageUrls' ELSE '[]'::jsonb END
+         ) AS photo(url)
+         WHERE right(coalesce(photo.url,''), length(suffix))=suffix
+       )
+  ) OR EXISTS (
+    SELECT 1 FROM public.nb_home_public h
+    WHERE EXISTS (
+      SELECT 1 FROM unnest(content_keys) AS k(field_name)
+      WHERE right(coalesce(h.content->>k.field_name,''), length(suffix))=suffix
+    ) OR EXISTS (
+      SELECT 1 FROM jsonb_each_text(
+        CASE WHEN jsonb_typeof(h.content->'sectionVideos')='object'
+          THEN h.content->'sectionVideos' ELSE '{}'::jsonb END
+      ) AS v(key,url)
+      WHERE right(coalesce(v.url,''), length(suffix))=suffix
+    ) OR EXISTS (
+      SELECT 1 FROM jsonb_each_text(
+        CASE WHEN jsonb_typeof(h.content->'featuredImages')='object'
+          THEN h.content->'featuredImages' ELSE '{}'::jsonb END
+      ) AS f(key,url)
+      WHERE right(coalesce(f.url,''), length(suffix))=suffix
+    )
+  ) OR EXISTS (
+    SELECT 1 FROM public.nb_home_drafts d
+    WHERE EXISTS (
+      SELECT 1 FROM unnest(content_keys) AS k(field_name)
+      WHERE right(coalesce(d.content->>k.field_name,''), length(suffix))=suffix
+    ) OR EXISTS (
+      SELECT 1 FROM jsonb_each_text(
+        CASE WHEN jsonb_typeof(d.content->'sectionVideos')='object'
+          THEN d.content->'sectionVideos' ELSE '{}'::jsonb END
+      ) AS v(key,url)
+      WHERE right(coalesce(v.url,''), length(suffix))=suffix
+    ) OR EXISTS (
+      SELECT 1 FROM jsonb_each_text(
+        CASE WHEN jsonb_typeof(d.content->'featuredImages')='object'
+          THEN d.content->'featuredImages' ELSE '{}'::jsonb END
+      ) AS f(key,url)
+      WHERE right(coalesce(f.url,''), length(suffix))=suffix
+    )
+  ) THEN
+    RAISE EXCEPTION
+      'Media is still referenced by a product, collection, published page or saved draft. Unlink and save/publish its replacement first.'
+      USING ERRCODE='23503';
+  END IF;
+
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
+END
+$guard$;
+
+-- Final reconciliation check: all private data stays behind RLS and API roles
+-- cannot bypass the private CMS boundary after this non-destructive upgrade.
+DO $nb_install_assert$
+BEGIN
+  IF NOT (
+    (SELECT relrowsecurity FROM pg_class WHERE oid='public.nb_products'::regclass)
+    AND (SELECT relrowsecurity FROM pg_class WHERE oid='public.nb_media'::regclass)
+    AND (SELECT relrowsecurity FROM pg_class WHERE oid='public.nb_product_drafts'::regclass)
+    AND (SELECT relrowsecurity FROM pg_class WHERE oid='public.nb_sku_counters'::regclass)
+  ) THEN
+    RAISE EXCEPTION 'Required CMS row-level security is not enabled';
+  END IF;
+
+  IF has_table_privilege('anon','public.nb_product_drafts','SELECT')
+    OR has_table_privilege('anon','public.nb_media','SELECT')
+    OR has_table_privilege('anon','public.nb_sku_counters','SELECT')
+    OR has_table_privilege('anon','public.nb_sku_counters','INSERT')
+    OR has_table_privilege('anon','public.nb_sku_counters','UPDATE')
+    OR has_table_privilege('anon','public.nb_sku_counters','DELETE')
+    OR has_table_privilege('anon','public.nb_sku_counters','TRUNCATE')
+  THEN
+    RAISE EXCEPTION 'Anonymous access to private CMS data or SKU counters is too broad';
+  END IF;
+
+  IF has_schema_privilege('anon','nb_internal','USAGE')
+    OR has_schema_privilege('authenticated','nb_internal','USAGE')
+  THEN
+    RAISE EXCEPTION 'Internal CMS schema must not be directly accessible to API roles';
+  END IF;
+
+  IF NOT has_function_privilege('authenticated','public.nb_publish_product(uuid)','EXECUTE')
+    OR has_function_privilege('anon','public.nb_publish_product(uuid)','EXECUTE')
+  THEN
+    RAISE EXCEPTION 'Product publishing RPC privileges are incorrect';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='nb_products' AND column_name='video_urls'
+  ) THEN
+    RAISE EXCEPTION 'Multi-video product gallery column is missing';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id='nb-media-staging')
+    OR NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id='nb-media-public')
+  THEN
+    RAISE EXCEPTION 'Private staging and public media buckets must both exist';
+  END IF;
+END
+$nb_install_assert$;
 
 COMMIT;
 -- NEXT: deploy nb-media-approval Edge

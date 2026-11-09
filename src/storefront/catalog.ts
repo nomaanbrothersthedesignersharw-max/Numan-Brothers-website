@@ -13,6 +13,7 @@ export type CatalogProduct = Product & {
   published?: boolean;
   isPublished?: boolean;
   videoUrl?: string;
+  videoUrls?: string[];
   slug?:string;
   sku?:string;
   originalPrice?:number;

@@ -3,7 +3,7 @@ import type {SupabaseClient} from '@supabase/supabase-js';
 import {ArrowDown,ArrowUp,CloudUpload,ImagePlus,Pencil,Trash2,Video,GripVertical} from 'lucide-react';
 import type {CmsMediaRow} from '../../lib/cmsData';
 import {mediaPublicUrl} from '../../lib/cmsData';
-import {uploadCmsFile,checkMediaFile} from '../../lib/cmsUpload';
+import {runWithConcurrency,uploadCmsFile,checkMediaFile} from '../../lib/cmsUpload';
 import {COLLECTION_ROUTES} from '../../storefront/navigation';
 import {ErrorText,inputClass,labelClass,outlineClass,primaryClass} from './StudioShared';
 
@@ -29,6 +29,7 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
   const [total,setTotal]=useState(0);
   const [loading,setLoading]=useState(false);
   const [uploading,setUploading]=useState(false);
+  const [preparing,setPreparing]=useState(false);
   const [progress,setProgress]=useState(0);
   const [error,setError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
@@ -62,35 +63,63 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
   };
   const filesFromComputer=async(files:File[])=>{
     if(!userId||!files.length||uploading)return;
-    setError(null);setNotice(null);setUploading(true);
-    let chosen=[...selected],pending=0;
+    setError(null);setNotice(null);setUploading(true);setPreparing(false);
+    const preparingByFile=files.map(()=>false);
+    const progressByFile=files.map(()=>0);
+    const weights=files.map(file=>Math.max(1,file.size));
+    const totalBytes=weights.reduce((sum,n)=>sum+n,0);
     try{
-      for(const file of files){
+      const results=await runWithConcurrency(files,multiple?2:1,async(file,index)=>{
         if(allowVideo!==file.type.startsWith('video/'))
           throw new Error(allowVideo?'Choose MP4 or WebM video files.':'Choose JPG/PNG/WebP/AVIF/GIF photographs.');
         const validation=checkMediaFile(file);if(validation)throw new Error(validation);
-        const asset=await uploadCmsFile(client,file,userId,p=>setProgress(p),{
+        const asset=await uploadCmsFile(client,file,userId,percent=>{
+          progressByFile[index]=percent;
+          const transferred=progressByFile.reduce((sum,p,i)=>sum+weights[i]*p/100,0);
+          setProgress(Math.min(100,Math.round(100*transferred/totalBytes)));
+        },{
           department:dept||null,categoryPath:category||null,
+          onPreparing:()=>{
+            preparingByFile[index]=true;setPreparing(true);
+            setNotice(file.type.startsWith('video/')?'Preparing video '+file.name+'…':'Optimizing image '+file.name+'…');
+          },
+          onPrepared:()=>{
+            preparingByFile[index]=false;
+            const stillPreparing=preparingByFile.some(Boolean);
+            setPreparing(stillPreparing);
+            if(!stillPreparing)setNotice('Media prepared. Uploading…');
+          },
         });
+        let approved=false;
         if(canPublish){
           const {data,error}=await client.functions.invoke('nb-media-approval',{
             body:{id:asset.id,action:'approve'},
           });
-          if(error||!data?.ok){
-            pending++;
-            setNotice('The file was uploaded privately; approval could not finish. Open Media to approve it.');
-            continue;
-          }
-          const url=mediaPublicUrl(asset.storage_path);
-          chosen=multiple?[...new Set([...chosen,url])]:[url];
-        }else pending++;
+          approved=!error&&Boolean(data?.ok);
+        }
+        return {asset,approved};
+      });
+      const uploaded=results.filter((x):x is {ok:true;value:{asset:CmsMediaRow;approved:boolean}}=>x.ok)
+        .map(x=>x.value);
+      const failed=results.filter((x):x is {ok:false;error:unknown}=>x.ok===false);
+      const approvedUrls=uploaded.filter(x=>x.approved).map(x=>mediaPublicUrl(x.asset.storage_path));
+      let next=[...selected];
+      if(multiple)next=[...new Set([...next,...approvedUrls])];
+      else if(approvedUrls.length)next=[approvedUrls.at(-1)!];
+      if(approvedUrls.length)onChange(next);
+      const pending=uploaded.filter(x=>!x.approved).length;
+      if(failed.length){
+        const first=failed[0];
+        const reason=first
+          ?(first.error instanceof Error?first.error.message:'Upload failed.'):'Upload failed.';
+        setError(uploaded.length+' file(s) uploaded; '+failed.length+' failed. Retry the failed file(s). '+reason);
       }
-      if(canPublish && chosen.length)onChange(chosen);
-      if(pending && !canPublish)setNotice(pending+' file(s) uploaded to Media → Pending. Ask an admin to approve before selecting.');
-      else if(!pending)setNotice('Uploaded, approved and selected. Save your draft to keep this change.');
+      if(pending)setNotice(pending+' file(s) uploaded privately to Media → Pending. An owner/admin must approve before selecting.');
+      else if(approvedUrls.length)setNotice(approvedUrls.length+' photo(s) compressed where possible, uploaded, approved and selected. Save your draft to keep this change.');
+      else if(!failed.length)setNotice('Upload complete.');
       setPage(0);setReload(n=>n+1);onUploaded?.();
     }catch(e){setError(e instanceof Error?e.message:'Upload failed.');}
-    finally{setUploading(false);setProgress(0);setDragging(false);}
+    finally{setUploading(false);setPreparing(false);setProgress(0);setDragging(false);}
   };
   const deleteFromDatabase=async(url:string)=>{
     if(!canPublish)return;
@@ -160,7 +189,7 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
       onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setDragging(false)}}
       onDrop={e=>{e.preventDefault();e.stopPropagation();setDragging(false);void filesFromComputer(Array.from(e.dataTransfer.files))}}
       className={'flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-5 text-center '+(dragging?'border-amber-800 bg-amber-50':'border-stone-300 bg-stone-50')}>
-      <CloudUpload size={27}/><p className="text-sm font-semibold">{uploading?'Uploading '+progress+'%':'Drag & drop '+(allowVideo?'a video':'photos')+' here'}</p>
+      <CloudUpload size={27}/><p className="text-sm font-semibold">{uploading?(preparing?'Preparing media…':'Uploading '+progress+'%'):'Drag & drop '+(allowVideo?'a video':'photos')+' here'}</p>
       <p className="text-xs text-stone-500">Or click to browse your computer · up to 50 MB each · uploads are private until approved</p>
       <input ref={input} type="file" className="sr-only" multiple={multiple}
         accept={allowVideo?'video/mp4,video/webm':'image/jpeg,image/png,image/webp,image/avif,image/gif'}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ArrowLeft, ArrowRight, Plus, Save, Send, Archive, Trash2 } from 'lucide-react';
 import { type CmsProductRow, isSafeHttps } from '../../lib/cmsData';
@@ -10,19 +10,20 @@ import {ErrorText,Field,inputClass,outlineClass,primaryClass} from './StudioShar
 interface Props {client:SupabaseClient;userId:string;canPublish:boolean;}
 interface Draft {
   sku:string;slug:string;title:string;department:'men'|'kids';categoryPaths:string[];
-  description:string;fabric:string;sizes:string[];imageUrls:string[];videoUrl:string;
+  description:string;fabric:string;sizes:string[];imageUrls:string[];videoUrls:string[];videoUrl:string;
   price:string;offerPrice:string;customizable:boolean;sortRank:number;
 }
 type ProductRevision={id:number;version:number;published_at:string;content:unknown};
 type Entry={id:string;label:string;sku:string;live:boolean;draft:boolean;form:Draft};
 const blank: Draft = {
   sku:'',slug:'',title:'',department:'men',categoryPaths:[],description:'',
-  fabric:'',sizes:[],imageUrls:[],videoUrl:'',price:'',offerPrice:'',customizable:false,sortRank:0,
+  fabric:'',sizes:[],imageUrls:[],videoUrls:[],videoUrl:'',price:'',offerPrice:'',customizable:false,sortRank:0,
 };
 const fromPublished=(p:CmsProductRow):Draft=>({
   sku:p.sku,slug:p.slug,title:p.title,department:p.department,
   categoryPaths:p.category_paths||[],description:p.description||'',fabric:p.fabric||'',
-  sizes:p.sizes||[],imageUrls:p.image_urls||[],videoUrl:p.video_url||'',
+  sizes:p.sizes||[],imageUrls:p.image_urls||[],videoUrls:p.video_urls||[],
+  videoUrl:p.video_url && !(p.video_urls||[]).includes(p.video_url) ? p.video_url : '',
   price:p.price===null?'':String(p.price),
   offerPrice:p.offer_price===null?'':String(p.offer_price),
   customizable:Boolean(p.customizable),sortRank:p.sort_rank||0,
@@ -35,6 +36,7 @@ const fromUnknown=(value:unknown):Draft=>{
     categoryPaths:Array.isArray(d.categoryPaths)?d.categoryPaths.filter((x):x is string=>typeof x==='string'):[],
     imageUrls:Array.isArray(d.imageUrls)?d.imageUrls.filter((x):x is string=>typeof x==='string'):[],
     sizes:Array.isArray(d.sizes)?d.sizes.filter((x):x is string=>typeof x==='string'):[],
+    videoUrls:Array.isArray(d.videoUrls)?d.videoUrls.filter((x):x is string=>typeof x==='string').slice(0,200):[],
     price:typeof d.price==='string'?d.price:'',
     offerPrice:typeof d.offerPrice==='string'?d.offerPrice:'',
     customizable:Boolean(d.customizable),
@@ -52,6 +54,9 @@ function validate(form:Draft):string|null {
   if(!form.categoryPaths.length)return 'Choose at least one collection before publishing.';
   if(!form.imageUrls.length)return 'Choose at least one approved product photograph.';
   if(form.videoUrl && !isSafeHttps(form.videoUrl))return 'The optional video link must use HTTPS.';
+  if(form.videoUrls.length>200)return 'A product can have at most 200 video references.';
+  if(form.videoUrls.some(url=>!isSafeHttps(url)))return 'Every video URL must use HTTPS.';
+  if(form.videoUrl && !form.videoUrls.includes(form.videoUrl) && form.videoUrls.length>=200)return 'A product can have at most 200 video references.';
   if(form.price && (!Number.isFinite(Number(form.price))||Number(form.price)<0))return 'Enter a valid original price.';
   if(form.offerPrice && (!form.price||!Number.isFinite(Number(form.offerPrice))||
     Number(form.offerPrice)<0||Number(form.offerPrice)>=Number(form.price)))
@@ -76,6 +81,15 @@ export default function CmsProducts({client,userId,canPublish}:Props){
   const [departmentFilter,setDepartmentFilter]=useState('all');
   const [revisions,setRevisions]=useState<ProductRevision[]>([]);
   const [revisionsLoading,setRevisionsLoading]=useState(false);
+  const [dirty,setDirty]=useState(false);
+  const [saveState,setSaveState]=useState<'idle'|'saving'|'saved'|'failed'>('idle');
+  const [lastSavedAt,setLastSavedAt]=useState<string|null>(null);
+  const latestFormRef=useRef(form);
+  const latestIdRef=useRef(id);
+  const savedSnapshotRef=useRef('');
+  const draftSaveQueue=useRef<Promise<void>>(Promise.resolve());
+  latestFormRef.current=form;
+  latestIdRef.current=id;
   const active=rows.find((r)=>r.id===id);
   const categories=COLLECTION_ROUTES.filter((c)=>!c.isDepartment && !c.isGroup && c.department===form.department);
   // Asset pickers query only when opened; published URLs are verified server-side.
@@ -112,8 +126,58 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     else setRevisions((data||[]) as ProductRevision[]);
     setRevisionsLoading(false);
   };
+  const persistDraft=useCallback(async(productId:string,snapshot:Draft,announce=false):Promise<boolean>=>{
+    const serialized=JSON.stringify(snapshot);
+    const snapshotKey=productId+':'+serialized;
+    if(savedSnapshotRef.current===snapshotKey)return true;
+    setSaveState('saving');
+    const operation=draftSaveQueue.current.then(async()=>{
+      const {error}=await client.from('nb_product_drafts').upsert({
+        product_id:productId,content:snapshot,updated_by:userId,
+      },{onConflict:'product_id'});
+      if(error)throw error;
+      savedSnapshotRef.current=snapshotKey;
+      setRows(current=>{
+        const exists=current.some(item=>item.id===productId);
+        const nextEntry:Entry={id:productId,label:snapshot.title.trim()||'(Untitled draft)',
+          sku:snapshot.sku,live:current.find(item=>item.id===productId)?.live||false,
+          draft:true,form:{...blank}};
+        return exists?current.map(item=>item.id===productId?{...item,...nextEntry}:item):[nextEntry,...current];
+      });
+      if(latestIdRef.current===productId&&JSON.stringify(latestFormRef.current)===serialized){
+        setDirty(false);
+        setSaveState('saved');
+        setLastSavedAt(new Date().toISOString());
+      }
+      if(announce)setMessage('Draft saved privately. This change is not visible to customers.');
+    });
+    draftSaveQueue.current=operation.then(()=>undefined,()=>undefined);
+    try{await operation;return true;}
+    catch(cause){
+      if(latestIdRef.current===productId){
+        setSaveState('failed');
+        setError('Auto-save failed: '+(cause instanceof Error?cause.message:'database error')+'. Your edits remain on screen; retry Save private draft.');
+      }
+      return false;
+    }
+  },[client,userId]);
+
+  // Persist incomplete product drafts as the user types. The database accepts
+  // partial JSON drafts; validation is enforced at publish, not during editing.
+  useEffect(()=>{
+    if(!id||!dirty)return;
+    const productId=id;
+    const snapshot={...form};
+    const timer=setTimeout(()=>{void persistDraft(productId,snapshot);},650);
+    return()=>clearTimeout(timer);
+  },[id,form,dirty,persistDraft]);
   const open=async(entry:Entry)=>{
-    setIsNew(false);setId(entry.id);setPublishedSlug(null);setError(null);setMessage(null);setBusy(true);
+    const currentId=latestIdRef.current;
+    if(currentId&&dirty){
+      const flushed=await persistDraft(currentId,latestFormRef.current);
+      if(!flushed)return;
+    }
+    setIsNew(false);setId(entry.id);setPublishedSlug(null);setError(null);setMessage(null);setBusy(true);setDirty(false);setSaveState('idle');
     setRevisions([]);void loadRevisions(entry.id);
     const [draft,published]=await Promise.all([
       client.from('nb_product_drafts').select('content').eq('product_id',entry.id).maybeSingle(),
@@ -126,21 +190,54 @@ export default function CmsProducts({client,userId,canPublish}:Props){
       setPublishedSlug(published.data?.status==='published'?String(published.data.slug||''):null);
       setForm(draft.data?fromUnknown(draft.data.content):
       published.data?fromPublished(published.data as CmsProductRow):{...blank});
+      setDirty(false);setSaveState(draft.data?'saved':'idle');
     }
     setBusy(false);
   };
-  const update=<K extends keyof Draft>(key:K,value:Draft[K])=>setForm((current)=>({...current,[key]:value}));
-  const create=()=>{setId(crypto.randomUUID());setPublishedSlug(null);setIsNew(true);setForm({...blank});setRevisions([]);setError(null);setMessage(null)};
+  const update=<K extends keyof Draft>(key:K,value:Draft[K])=>{
+    setDirty(true);setSaveState('idle');
+    setForm(current=>({...current,[key]:value}));
+  };
+  const create=async()=>{
+    const currentId=latestIdRef.current;
+    if(currentId){
+      setBusy(true);
+      const flushed=await persistDraft(currentId,latestFormRef.current);
+      setBusy(false);
+      if(!flushed)return;
+    }
+    const productId=crypto.randomUUID();
+    const fresh={...blank};
+    setId(productId);setPublishedSlug(null);setIsNew(true);setForm(fresh);
+    setDirty(false);setSaveState('saving');setLastSavedAt(null);
+    setRevisions([]);setError(null);setMessage('New private draft created. Your edits will save automatically.');
+    void persistDraft(productId,fresh).then(saved=>{
+      if(saved&&latestIdRef.current===productId)setSaveState('saved');
+    });
+  };
+  const backToList=async()=>{
+    const currentId=latestIdRef.current;
+    if(currentId){
+      setBusy(true);
+      const flushed=await persistDraft(currentId,latestFormRef.current);
+      setBusy(false);
+      if(!flushed)return;
+    }
+    setId(null);setPublishedSlug(null);setIsNew(false);setForm({...blank});
+    setDirty(false);setSaveState('idle');setError(null);
+  };
   const slugify=(value:string)=>value.normalize('NFKD').toLowerCase()
     .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,110);
   const chooseCategory=async(path:string)=>{
     if(!path)return;
+    setDirty(true);setSaveState('idle');
     setForm(current=>({...current,categoryPaths:[path]}));
-    if(!isNew)return;
+    // A draft reopened after navigation/reload may still need its first SKU.
+    if(form.sku)return;
     setSkuLoading(true);setError(null);
     const {data,error}=await client.rpc('nb_next_sku',{p_category_path:path});
     if(error)setError('Could not generate SKU: '+error.message);
-    else if(data){
+    else if(data&&latestFormRef.current.categoryPaths[0]===path){
       const sku=String(data);
       setForm(current=>{
         const oldAuto=[slugify(current.title),current.sku.toLowerCase()].filter(Boolean).join('-');
@@ -159,11 +256,8 @@ export default function CmsProducts({client,userId,canPublish}:Props){
       if(form.title.trim().length<2||form.sku.trim().length<2||!form.categoryPaths.length)
         throw new Error('Choose a garment type, enter a title and generate a unique SKU before saving.');
       if(!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(form.slug))throw new Error('Use a lowercase hyphenated slug.');
-      const {error}=await client.from('nb_product_drafts').upsert({
-        product_id:id,content:form,updated_by:userId,
-      },{onConflict:'product_id'});
-      if(error)throw error;
-      setMessage('Draft saved privately. This change is not visible to customers.');
+      const saved=await persistDraft(id,form,true);
+      if(!saved)throw new Error('Draft could not be saved. See the auto-save message above.');
       await load();return true;
     }catch(cause){setError(cause instanceof Error?cause.message:'Draft save failed.');return false}
     finally{setBusy(false)}
@@ -206,7 +300,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><h2 className="font-serif text-3xl">Products</h2><p className="mt-2 text-sm text-stone-600">Create and edit private drafts; approved owners publish changes atomically.</p></div>
       <div className="flex flex-wrap gap-2">
-<button type="button" className={primaryClass} onClick={create}><Plus size={16}/> New product</button>
+<button type="button" className={primaryClass} onClick={()=>void create()} disabled={busy}><Plus size={16}/> New product</button>
        </div>
     </div>
     <div className="nb-responsive-grid grid gap-3 rounded-lg border border-stone-200 bg-white p-3 min-[360px]:p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,auto)]">
@@ -247,7 +341,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
           <p className="font-serif text-3xl">Select a product</p>
           <p className="text-sm text-stone-600">Or click “New product” to start a draft.</p>
         </div>:<div className="space-y-6">
-          <button type="button" className="flex items-center gap-2 text-xs text-stone-600" onClick={()=>setId(null)}><ArrowLeft size={14}/> Back to product list</button>
+          <button type="button" className="flex items-center gap-2 text-xs text-stone-600" onClick={()=>void backToList()} disabled={busy}><ArrowLeft size={14}/> Back to product list</button>
           <h3 className="font-serif text-2xl">{active?.label||'New product draft'}</h3>
           <p className="text-xs text-stone-600">{publishedSlug?'This product is live. Edit any fields below, then select Update published product. Customers see only the new published version.':'Save a private draft, then publish when the product and photos are ready.'}</p>
            <p className="break-all text-xs text-stone-500">Internal record ID: {id}</p>
@@ -260,7 +354,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
             <div className="nb-responsive-grid grid gap-3 sm:grid-cols-2">
               {(['men','kids'] as const).map(dept=><button type="button" key={dept} aria-pressed={form.department===dept}
                 className={(form.department===dept?primaryClass:outlineClass)+' w-full'}
-                onClick={()=>{setForm({...form,department:dept,categoryPaths:[],sku:isNew?'':form.sku,slug:isNew?'':form.slug})}}>
+                onClick={()=>{setDirty(true);setSaveState('idle');setForm({...form,department:dept,categoryPaths:[],sku:isNew?'':form.sku,slug:isNew?'':form.slug})}}>
                 {dept==='men'?"Men’s Wear":"Kids Wear"}</button>)}
             </div>
             <label className="block text-sm font-semibold">Garment category (required)
@@ -274,7 +368,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
           </section>
           <div className="nb-responsive-grid grid gap-5 md:grid-cols-2">
             <Field label="Garment title"><input className={inputClass} value={form.title} onChange={e=>{
-              const title=e.target.value;setForm(cur=>{
+              const title=e.target.value;setDirty(true);setSaveState('idle');setForm(cur=>{
                 const oldAuto=[slugify(cur.title),cur.sku.toLowerCase()].filter(Boolean).join('-');
                 const shouldUpdate=!cur.slug||cur.slug===oldAuto||cur.slug===slugify(cur.title);
                 return {...cur,title,slug:shouldUpdate
@@ -319,11 +413,12 @@ export default function CmsProducts({client,userId,canPublish}:Props){
             <p className="text-xs leading-6 text-stone-600">Drag photos here—an authorized owner upload is approved and attached automatically. For bulk imports, use the exact SKU, e.g. {form.sku||'NB-SH-00001'}_01.jpg. The trash icon only detaches a photo; it does not delete the library copy.</p>
             <AssetEditor client={client} userId={userId} canPublish={canPublish} label="Product photos · first is the cover" multiple department={form.department} categoryPath={form.categoryPaths[0]||''}
               selected={form.imageUrls} onChange={urls=>update('imageUrls',urls)}/>
-            <AssetEditor client={client} userId={userId} canPublish={canPublish} label="Optional garment video"
-              allowVideo department={form.department} categoryPath={form.categoryPaths[0]||''}
-              selected={form.videoUrl?[form.videoUrl]:[]} onChange={urls=>update('videoUrl',urls[0]||'')}/>
+            <AssetEditor client={client} userId={userId} canPublish={canPublish} label="Product video library · up to 200 clips, loaded on demand"
+              multiple allowVideo department={form.department} categoryPath={form.categoryPaths[0]||''}
+              selected={form.videoUrls} onChange={urls=>update('videoUrls',urls.slice(0,200))}/>
           </div>
-          <Field label="Or external HTTPS video / streaming link"><input type="url" className={inputClass} value={form.videoUrl} onChange={e=>update('videoUrl',e.target.value)} placeholder="https://..."/></Field>
+          <p className="text-xs leading-6 text-stone-600">Video references are saved in order. Only the selected clip is loaded on the public product page; 100–200 video players are never loaded at once. Keep clips short and optimized. You may also add one external streaming link below.</p>
+          <Field label="Optional external HTTPS video / streaming link"><input type="url" className={inputClass} value={form.videoUrl} onChange={e=>update('videoUrl',e.target.value)} placeholder="https://..."/></Field>
           <section aria-labelledby="product-revisions-title" className="space-y-3 rounded-lg border border-[#ded0bc] bg-[#faf7f0] p-5">
             <h4 id="product-revisions-title" className="font-serif text-xl text-[#31261c]">Published history</h4>
             <p className="text-xs leading-6 text-[#76685b]">Each publish creates a numbered, read-only snapshot. Editing a private draft does not change an earlier published version. Reverting requires an authorized reviewed new publication.</p>
@@ -337,6 +432,9 @@ export default function CmsProducts({client,userId,canPublish}:Props){
                 </time>
               </li>)}</ol>}
           </section>
+          <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600" role="status" aria-live="polite">
+            {saveState==='saving'?'Saving private draft…':saveState==='failed'?'Auto-save failed — use Save private draft to retry.':saveState==='saved'?'Draft saved automatically · '+(lastSavedAt?new Date(lastSavedAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'just now'):'Draft changes save automatically while you work.'}
+          </div>
           <div className="flex flex-wrap gap-3 border-t border-stone-200 pt-6">
             <button type="button" className={outlineClass} disabled={busy} onClick={()=>void save()}><Save size={15}/> Save private draft</button>
             {canPublish&&<button type="button" className={primaryClass} disabled={busy||skuLoading} onClick={()=>void publish()}><Send size={15}/> {publishedSlug?'Update published product':'Publish product'}</button>}

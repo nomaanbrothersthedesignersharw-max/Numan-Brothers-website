@@ -16,7 +16,8 @@ test('six Studio pages are grouped, including dedicated bulk imports',()=>{
   for(const id of ['dashboard','products','collections','media','imports','homepage'])
     assert.match(s,new RegExp("id:'"+id+"'"));
   assert.match(s,/studioGroups\.map/);
-  assert.match(s,/section==='imports'&&<CmsImports/);
+  assert.match(s,/visitedSections\.has\('imports'\)/);
+  assert.match(s,/hidden=\{section!=='imports'\}/);
   assert.doesNotMatch(s,/\.limit\(300\)|loadMedia\(\)/);
 });
 test('media library filters by MIME and paginates on the server',()=>{
@@ -35,9 +36,9 @@ test('media asset chooser only queries after opening',()=>{
 test('upload validation and private TUS chunking remain unchanged',()=>{
   const s=source('src/lib/cmsUpload.ts');
   assert.match(s,/MAX_MEDIA_SIZE = 50 \* 1024 \* 1024/);
-  assert.match(s,/const CHUNK_SIZE = 6 \* 1024 \* 1024/);
+  assert.match(s,/TUS_CHUNK_SIZE = 6 \* 1024 \* 1024/);
   assert.match(s,/nb-media-staging/);
-  assert.match(s,/resumableUpload\(client, path, file, onProgress\)/);
+  assert.match(s,/resumableUpload\(client,path,uploadFile,onProgress\)/);
 });
 
 test('admin studio does not fetch public catalogue data in the background',()=>{

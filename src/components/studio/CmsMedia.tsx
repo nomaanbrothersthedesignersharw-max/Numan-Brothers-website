@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {ImagePlus,CheckCircle2,Upload,Archive,Trash2,RotateCcw} from 'lucide-react';
 import {COLLECTION_ROUTES} from '../../storefront/navigation';
 import { type CmsMediaRow, mediaPublicUrl } from '../../lib/cmsData';
-import { uploadCmsFile } from '../../lib/cmsUpload';
+import { runWithConcurrency, uploadCmsFile } from '../../lib/cmsUpload';
 import { ErrorText, inputClass, outlineClass, primaryClass } from './StudioShared';
 
 interface Props { client: SupabaseClient; userId:string; canPublish:boolean; onMediaChange:()=>void; }
@@ -13,7 +13,9 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
   const [error,setError] = useState<string|null>(null);
   const [uploading,setUploading] = useState(false);
   const [progress,setProgress] = useState(0);
-  const [selection,setSelection] = useState<FileList|null>(null);
+  const [selection,setSelection] = useState<File[]>([]);
+  const [fileStatuses,setFileStatuses] = useState<{name:string;status:'queued'|'preparing'|'uploading'|'done'|'failed';progress:number;error?:string}[]>([]);
+  const [compressionSaved,setCompressionSaved] = useState(0);
   const [busyId,setBusyId] = useState<string|null>(null);
   const [altDrafts,setAltDrafts] = useState<Record<string,string>>({});
   const [nameDrafts,setNameDrafts] = useState<Record<string,string>>({});
@@ -60,20 +62,64 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
   useEffect(()=>{const timer=setTimeout(()=>void refresh(),220);return()=>clearTimeout(timer)},[client,page,search,typeFilter,approvalFilter,filterDept,filterCategory,archivedFilter]);
 
   const upload = async () => {
-    if (!selection?.length || uploading) return;
+    if (!selection.length || uploading) return;
     if(selection.length>100){setError('Choose up to 100 files here, or use Bulk imports for larger batches.');return;}
-    setUploading(true);setError(null);
-    try {
-      for (const file of Array.from(selection)) {
-        setProgress(0);
-        await uploadCmsFile(client,file,userId,setProgress,{department:uploadDept||null,categoryPath:uploadCategory||null});
+    const files=[...selection];
+    const progressByFile=files.map(()=>0);
+    const weights=files.map(file=>Math.max(1,file.size));
+    const totalBytes=weights.reduce((sum,n)=>sum+n,0);
+    let preparedSaved=0;
+    setUploading(true);setError(null);setCompressionSaved(0);
+    setFileStatuses(files.map(file=>({name:file.name,status:'queued',progress:0})));
+    setProgress(0);
+    const setFileProgress=(index:number,value:number)=>{
+      progressByFile[index]=value;
+      const uploaded=progressByFile.reduce((sum,p,i)=>sum+weights[i]*p/100,0);
+      setProgress(Math.min(100,Math.round(100*uploaded/totalBytes)));
+      setFileStatuses(current=>current.map((item,i)=>i===index
+        ?{...item,status:'uploading',progress:value}:item));
+    };
+    try{
+      const results=await runWithConcurrency(files,2,async(file,index)=>{
+        const asset=await uploadCmsFile(client,file,userId,
+          value=>setFileProgress(index,value),{
+            department:uploadDept||null,
+            categoryPath:uploadCategory||null,
+            onPreparing:()=>setFileStatuses(current=>current.map((item,i)=>i===index
+              ?{...item,status:'preparing',progress:0}:item)),
+            onPrepared:info=>{
+              preparedSaved+=Math.max(0,info.originalBytes-info.preparedBytes);
+              setCompressionSaved(preparedSaved);
+            },
+          });
+        setFileStatuses(current=>current.map((item,i)=>i===index
+          ?{...item,status:'done',progress:100}:item));
+        return asset;
+      });
+      const failed:File[]=[];
+      let succeeded=0;
+      results.forEach((result,index)=>{
+        if(result.ok===true)succeeded++;
+        else{
+          failed.push(files[index]);
+          const message=result.error instanceof Error?result.error.message:'Upload failed.';
+          setFileStatuses(current=>current.map((item,i)=>i===index
+            ?{...item,status:'failed',error:message}:item));
+        }
+      });
+      setSelection(failed);
+      if(succeeded>0){await refresh();onMediaChange();}
+      if(failed.length){
+        setError(succeeded+' file(s) uploaded. '+failed.length+' failed and remain selected; click Retry to send only those files.');
+        setProgress(Math.round(100*succeeded/files.length));
+      }else{
+        setProgress(100);
+        setError(null);
+        setFileStatuses([]);
       }
-      setSelection(null);setProgress(0);
-      await refresh();
-      onMediaChange();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Upload failed.');
-    } finally { setUploading(false); }
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'Upload batch failed.');
+    }finally{setUploading(false);}
   };
   const approve = async (asset:CmsMediaRow) => {
     if (!canPublish) return;
@@ -152,13 +198,26 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
       </div>
       <input aria-label="Choose photos or videos" type="file" multiple
         accept="image/jpeg,image/png,image/webp,image/avif,image/gif,video/mp4,video/webm"
-        className={inputClass} onChange={(e)=>setSelection(e.currentTarget.files)}/>
+        className={inputClass} onChange={(e)=>{setSelection(Array.from(e.currentTarget.files||[]));setFileStatuses([]);setCompressionSaved(0);}}/>
       <p className="text-xs text-stone-500">Choose up to 100 files, 50 MB maximum each. Large files use resumable uploads; total capacity depends on the Supabase plan.</p>
-      {selection?.length?<p role="status" className="text-xs font-semibold text-stone-700">{selection.length} files selected</p>:null}
-      <button type="button" className={primaryClass} onClick={()=>void upload()} disabled={!selection?.length || uploading}>
-        <Upload size={16}/>{uploading ? 'Uploading ' + progress + '%' : 'Upload selected files'}
+      {selection.length?<p role="status" className="text-xs font-semibold text-stone-700">{selection.length} file(s) selected</p>:null}
+      {compressionSaved>0&&<p className="text-xs text-emerald-800">Browser compression saved {(compressionSaved/1024/1024).toFixed(2)} MB before upload.</p>}
+      {fileStatuses.length>0&&<ul aria-label="Upload queue" className="max-h-64 space-y-2 overflow-y-auto rounded-md border border-stone-200 bg-white p-3">
+        {fileStatuses.map((file,index)=><li key={file.name+'-'+index} className="space-y-1">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="min-w-0 truncate">{file.name}</span>
+            <span className={file.status==='failed'?'text-red-700':file.status==='done'?'text-emerald-700':'text-stone-500'}>
+              {file.status==='done'?'Uploaded':file.status==='failed'?'Failed':file.status==='queued'?'Queued':file.status==='preparing'?'Preparing media…':file.progress+'%'}
+            </span>
+          </div>
+          <progress aria-label={'Progress '+file.name} max={100} value={file.progress} className="block w-full"/>
+          {file.error&&<p className="text-[11px] text-red-700">{file.error}</p>}
+        </li>)}
+      </ul>}
+      <button type="button" className={primaryClass} onClick={()=>void upload()} disabled={!selection.length || uploading}>
+        <Upload size={16}/>{uploading ? (fileStatuses.some(x=>x.status==='preparing')?'Preparing media…':'Uploading batch ' + progress + '%') : fileStatuses.some(x=>x.status==='failed') ? 'Retry ' + selection.length + ' failed file(s)' : 'Upload selected files'}
       </button>
-      {uploading && <progress aria-label="Upload progress" max={100} value={progress} className="block w-full"/>}
+      {uploading && <progress aria-label="Overall upload progress" max={100} value={progress} className="block w-full"/>}
     </div>
     <div className="nb-responsive-grid grid gap-3 rounded-md border border-stone-200 bg-white p-3 min-[360px]:p-4 sm:grid-cols-2 xl:grid-cols-3">
       <input className={inputClass} type="search" aria-label="Search media filename or SKU"
