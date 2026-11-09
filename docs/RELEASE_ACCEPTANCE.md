@@ -64,6 +64,7 @@ The changes above are branch/project configuration work; they have not been merg
 ### Business content and storefront
 
 - [ ] Attach and verify the business-owned custom domain and canonical URL.
+- [ ] Add `SITE_CANONICAL_URL` to Vercel Production using the exact verified HTTPS origin for the business-owned custom domain; verify prerendered pages no longer contain `noindex`, `robots.txt` allows public routes (while disallowing `/studio` and `/api/`), and `/sitemap.xml`, `/sitemap-static.xml` and product sitemap pages return valid XML.
 - [ ] Validate HTTPS, redirects, DNS, sitemap, robots, canonical tags and structured data on the verified domain.
 - [ ] Confirm real product photography, descriptions, sizes, prices (where displayed) and image rights.
 - [ ] Confirm owner-approved contact numbers, social URLs and business address; never invent these.
