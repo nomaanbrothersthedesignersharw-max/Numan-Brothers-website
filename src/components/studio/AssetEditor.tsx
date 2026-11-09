@@ -29,6 +29,7 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
   const [total,setTotal]=useState(0);
   const [loading,setLoading]=useState(false);
   const [uploading,setUploading]=useState(false);
+  const [preparing,setPreparing]=useState(false);
   const [progress,setProgress]=useState(0);
   const [error,setError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
@@ -62,12 +63,13 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
   };
   const filesFromComputer=async(files:File[])=>{
     if(!userId||!files.length||uploading)return;
-    setError(null);setNotice(null);setUploading(true);
+    setError(null);setNotice(null);setUploading(true);setPreparing(false);
+    const preparingByFile=files.map(()=>false);
     const progressByFile=files.map(()=>0);
     const weights=files.map(file=>Math.max(1,file.size));
     const totalBytes=weights.reduce((sum,n)=>sum+n,0);
     try{
-      const results=await runWithConcurrency(files,multiple?3:1,async(file,index)=>{
+      const results=await runWithConcurrency(files,multiple?2:1,async(file,index)=>{
         if(allowVideo!==file.type.startsWith('video/'))
           throw new Error(allowVideo?'Choose MP4 or WebM video files.':'Choose JPG/PNG/WebP/AVIF/GIF photographs.');
         const validation=checkMediaFile(file);if(validation)throw new Error(validation);
@@ -77,6 +79,16 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
           setProgress(Math.min(100,Math.round(100*transferred/totalBytes)));
         },{
           department:dept||null,categoryPath:category||null,
+          onPreparing:()=>{
+            preparingByFile[index]=true;setPreparing(true);
+            setNotice(file.type.startsWith('video/')?'Preparing video '+file.name+'…':'Optimizing image '+file.name+'…');
+          },
+          onPrepared:()=>{
+            preparingByFile[index]=false;
+            const stillPreparing=preparingByFile.some(Boolean);
+            setPreparing(stillPreparing);
+            if(!stillPreparing)setNotice('Media prepared. Uploading…');
+          },
         });
         let approved=false;
         if(canPublish){
@@ -107,7 +119,7 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
       else if(!failed.length)setNotice('Upload complete.');
       setPage(0);setReload(n=>n+1);onUploaded?.();
     }catch(e){setError(e instanceof Error?e.message:'Upload failed.');}
-    finally{setUploading(false);setProgress(0);setDragging(false);}
+    finally{setUploading(false);setPreparing(false);setProgress(0);setDragging(false);}
   };
   const deleteFromDatabase=async(url:string)=>{
     if(!canPublish)return;
@@ -177,7 +189,7 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
       onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setDragging(false)}}
       onDrop={e=>{e.preventDefault();e.stopPropagation();setDragging(false);void filesFromComputer(Array.from(e.dataTransfer.files))}}
       className={'flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-5 text-center '+(dragging?'border-amber-800 bg-amber-50':'border-stone-300 bg-stone-50')}>
-      <CloudUpload size={27}/><p className="text-sm font-semibold">{uploading?'Uploading '+progress+'%':'Drag & drop '+(allowVideo?'a video':'photos')+' here'}</p>
+      <CloudUpload size={27}/><p className="text-sm font-semibold">{uploading?(preparing?'Preparing media…':'Uploading '+progress+'%'):'Drag & drop '+(allowVideo?'a video':'photos')+' here'}</p>
       <p className="text-xs text-stone-500">Or click to browse your computer · up to 50 MB each · uploads are private until approved</p>
       <input ref={input} type="file" className="sr-only" multiple={multiple}
         accept={allowVideo?'video/mp4,video/webm':'image/jpeg,image/png,image/webp,image/avif,image/gif'}
