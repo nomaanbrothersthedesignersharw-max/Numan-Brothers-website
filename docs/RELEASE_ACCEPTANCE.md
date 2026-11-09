@@ -52,7 +52,7 @@ The changes above are branch/project configuration work; they have not been merg
 ### Supabase and CMS
 
 - [ ] Review the populated target project owner, billing and recovery configuration. The previous project ref `xiidzpsyuvfhyjudrrfq` is not accessible through the current connection; establish its ownership and confirm whether it contains any data before retiring it.
-- [ ] Compare the live Supabase schema with all 17 source migrations and reconcile the currently empty migration ledger without re-running the fresh installer; only then apply migration 17 and verify direct table privileges and the SKU reservation RPC.
+- [ ] Compare the live Supabase schema with all 18 source migrations and reconcile the currently empty migration ledger without re-running the fresh installer; only then apply migration 17 and verify direct table privileges and the SKU reservation RPC.
 - [ ] Deploy and test `nb-media-approval` with a non-production test image and actual owner/admin accounts; test approve, revoke, archive, restore, delete, stale role and referenced asset rejection.
 - [ ] Enable leaked-password protection in Supabase Auth and review the `pg_trgm` public-schema advisor finding.
 - [ ] Review and consolidate the two overlapping permissive policy pairs only after regression tests prove equivalent access for anonymous, editor and publisher roles.
