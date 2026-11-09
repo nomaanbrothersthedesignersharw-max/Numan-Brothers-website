@@ -253,7 +253,7 @@ export default function CmsStudio(){
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#29221b] text-xs font-semibold text-white">{index+1}</span>
                       <div><h4 className="text-sm font-semibold">{item.title}</h4>
                         <p className="mt-2 text-xs leading-6 text-stone-600">{item.detail}</p>
-                        <button type="button" onClick={()=>setSection(item.id)} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-800 underline underline-offset-4">
+                        <button type="button" onClick={()=>switchSection(item.id)} className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-800 underline underline-offset-4">
                           Open {sections.find(section=>section.id===item.id)?.label} <ArrowUpRight size={13}/>
                         </button>
                       </div>
