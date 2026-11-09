@@ -33,6 +33,7 @@ A Vercel deployment marked READY proves that an artifact deployed; it does not p
 - CSV error export now neutralizes actual control-character prefixes before spreadsheet formula markers.
 - Live smoke test now targets the actual single deployed site and permits the safe showroom contact fallback instead of requiring unconfigured phone data.
 - Workflow no longer targets the stale second CMS deployment URL.
+- Added Dependabot updates for the Bun lockfile and GitHub Actions, plus CodeQL JavaScript/TypeScript analysis. These workflows become active after the branch is merged; they still need successful runs.
 
 The changes above are branch/project configuration work; they have not been merged to `main` or promoted as a new Production deployment.
 
