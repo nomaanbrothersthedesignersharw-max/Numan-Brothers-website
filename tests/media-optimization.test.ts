@@ -1,5 +1,17 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { prepareMediaFile, runWithConcurrency } from '../src/lib/mediaOptimization';
+
+describe('upload preparation UX contract',()=>{
+  test('shows image optimization before upload and bounds simultaneous image decodes',()=>{
+    const upload=readFileSync(new URL('../src/lib/cmsUpload.ts',import.meta.url),'utf8');
+    const media=readFileSync(new URL('../src/components/studio/CmsMedia.tsx',import.meta.url),'utf8');
+    expect(upload).toContain('options?.onPreparing?.()');
+    expect(media).toContain("status:'preparing'");
+    expect(media).toContain('runWithConcurrency(files,2');
+    expect(media).toContain('Optimizing image…');
+  });
+});
 
 describe('browser media preparation safety',()=>{
   test('preserves GIF, WebP and videos without flattening animation or transcoding video',async()=>{
