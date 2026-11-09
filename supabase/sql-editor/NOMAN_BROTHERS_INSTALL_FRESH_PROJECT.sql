@@ -2110,8 +2110,15 @@ CREATE POLICY nb_media_staff_update ON public.nb_media
 DROP POLICY IF EXISTS nb_reviews_public_read ON public.nb_reviews;
 DROP POLICY IF EXISTS nb_reviews_staff_read ON public.nb_reviews;
 
-CREATE POLICY nb_reviews_public_staff_read ON public.nb_reviews
-  FOR SELECT TO anon, authenticated
+-- Keep the public policy free of staff-only function dependencies.
+-- Authenticated users get one policy that grants the union of public-approved
+-- rows and the additional staff-visible rows.
+CREATE POLICY nb_reviews_public_read ON public.nb_reviews
+  FOR SELECT TO anon
+  USING (status='approved');
+
+CREATE POLICY nb_reviews_authenticated_read ON public.nb_reviews
+  FOR SELECT TO authenticated
   USING (
     status='approved'
     OR (SELECT public.nb_can_edit())
@@ -2134,11 +2141,17 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname='public' AND tablename='nb_reviews'
-      AND policyname IN ('nb_reviews_public_read','nb_reviews_staff_read')
+      AND policyname='nb_reviews_staff_read'
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname='public' AND tablename='nb_reviews'
-      AND policyname='nb_reviews_public_staff_read' AND cmd='SELECT'
+      AND policyname='nb_reviews_public_read' AND cmd='SELECT'
+      AND roles=ARRAY['anon']::name[]
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND tablename='nb_reviews'
+      AND policyname='nb_reviews_authenticated_read' AND cmd='SELECT'
+      AND roles=ARRAY['authenticated']::name[]
   ) THEN
     RAISE EXCEPTION 'Reviews read policy consolidation failed';
   END IF;
