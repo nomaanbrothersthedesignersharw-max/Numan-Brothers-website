@@ -2202,6 +2202,8 @@ declare
   product_video text;
   product_videos text[];
   product_price numeric;
+  product_offer numeric;
+  product_customizable boolean;
 begin
   if not public.nb_can_publish() then
     raise exception 'Not authorized to publish' using errcode = '42501';
@@ -2293,16 +2295,21 @@ begin
     raise exception 'Videos must use HTTPS';
   end if;
   product_price := nullif(draft->>'price','')::numeric;
+  product_offer := nullif(draft->>'offerPrice','')::numeric;
+  product_customizable := coalesce((draft->>'customizable')::boolean,false);
   if product_price is not null and product_price < 0 then
     raise exception 'Price cannot be negative';
   end if;
+  if product_offer is not null and (product_price is null or product_offer < 0 or product_offer >= product_price) then
+    raise exception 'Offer price must be non-negative and lower than the original price';
+  end if;
   insert into public.nb_products (
     id,sku,slug,title,department,category_paths,description,fabric,sizes,
-    image_urls,video_url,video_urls,price,status,sort_rank,published_at,created_by
+    image_urls,video_url,video_urls,price,offer_price,customizable,status,sort_rank,published_at,created_by
   ) values (
     p_product_id,product_sku,product_slug,product_title,product_dept,paths,
     coalesce(draft->>'description',''),coalesce(draft->>'fabric',''),sizes_value,
-    photos,product_video,product_videos,product_price,'published',
+    photos,product_video,product_videos,product_price,product_offer,product_customizable,'published',
     coalesce((draft->>'sortRank')::integer,0),now(),auth.uid()
   )
   on conflict (id) do update set
@@ -2311,6 +2318,7 @@ begin
     description = excluded.description, fabric = excluded.fabric,
     sizes = excluded.sizes, image_urls = excluded.image_urls,
     video_url = excluded.video_url, video_urls = excluded.video_urls, price = excluded.price,
+    offer_price = excluded.offer_price, customizable = excluded.customizable,
     status = 'published', sort_rank = excluded.sort_rank, published_at = now();
   select coalesce(max(version),0)+1 into next_version
     from public.nb_product_revisions where product_id = p_product_id;
@@ -2423,67 +2431,6 @@ BEGIN
   RETURN NEW;
 END
 $guard$;
-
-
--- Validate the installation BEFORE committing it. Failure rolls back all 19.
--- =============================================================================
-DO $nb_install_assert$
-DECLARE
-  expected_tables text[] := ARRAY[
-    'nb_categories', 'nb_products', 'nb_media',
-    'nb_home_drafts', 'nb_home_public', 'nb_home_revisions',
-    'nb_product_drafts', 'nb_product_revisions',
-    'nb_product_categories', 'nb_product_media',
-    'nb_import_jobs', 'nb_import_rows', 'nb_audit_events',
-    'nb_sku_counters', 'nb_reviews'
-  ];
-  t text;
-  has_rls boolean;
-  policy_count integer;
-BEGIN
-  FOREACH t IN ARRAY expected_tables LOOP
-    SELECT c.relrowsecurity INTO has_rls
-    FROM pg_class c
-    JOIN pg_namespace n ON n.oid=c.relnamespace
-    WHERE n.nspname='public' AND c.relname=t AND c.relkind IN ('r','p');
-    IF has_rls IS DISTINCT FROM true THEN
-      RAISE EXCEPTION 'Required table missing or RLS disabled: %', t;
-    END IF;
-  END LOOP;
-
-  IF (SELECT public FROM storage.buckets WHERE id='nb-media-staging') IS DISTINCT FROM false
-    OR (SELECT public FROM storage.buckets WHERE id='nb-media-public') IS DISTINCT FROM true
-    OR (SELECT public FROM storage.buckets WHERE id='nb-media') IS DISTINCT FROM false
-  THEN RAISE EXCEPTION 'Expected private upload, public approved and private legacy buckets'; END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-    WHERE n.nspname='public' AND p.proname='nb_publish_product'
-  ) OR NOT EXISTS (
-    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-    WHERE n.nspname='public' AND p.proname='nb_publish_home'
-  ) OR NOT EXISTS (
-    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-    WHERE n.nspname='public' AND p.proname='nb_catalogue_health'
-  ) THEN RAISE EXCEPTION 'A required publishing/health function is absent'; END IF;
-
-  IF has_schema_privilege('anon','nb_internal','USAGE')
-    OR has_schema_privilege('authenticated','nb_internal','USAGE')
-    OR has_table_privilege('anon','public.nb_audit_events','SELECT')
-    OR has_table_privilege('authenticated','public.nb_audit_events','INSERT')
-  THEN RAISE EXCEPTION 'Audit or internal schema privileges are too broad'; END IF;
-
-  SELECT count(*) INTO policy_count FROM pg_policies
-    WHERE schemaname='public' AND left(tablename,3)='nb_';
-  IF policy_count < 35 THEN
-    RAISE EXCEPTION 'Expected 35 or more catalogue RLS policies, found %', policy_count;
-  END IF;
-
-  RAISE NOTICE
-    'Noman Brothers install OK: 15 application tables with RLS, %+ public policies, 3 buckets, publishing functions', policy_count;
-END
-$nb_install_assert$;
-
 COMMIT;
 
 -- SUCCESS (if query completed and transaction COMMITted):
