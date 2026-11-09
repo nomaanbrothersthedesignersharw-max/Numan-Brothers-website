@@ -10,7 +10,7 @@ A mobile-first, browse-and-enquire catalogue for the traditional menswear and ki
 - Hosting: one Vercel project, `numan-brothers-website`, connected to this repository.
 - Database/API: Supabase project `uinhybkdzevpxnugtvzf` (US East, PostgreSQL 17).
 
-**Current commissioning status:** The frontend deployment is READY, but a deployment marked READY is not proof of business go-live. The active Supabase project contains the CMS schema and 23 category records; it currently has no published products, product drafts, media records, homepage content or review records. The media-approval Edge Function is not yet deployed. Real garment photography, verified contact numbers/social accounts, owner-approved policy text, a custom domain, staff-account verification and a tested restore/load plan remain release gates. The sample Plain Sherwani page is clearly marked **DEMO / NOT FOR SALE**. Payments, POS and accurate inventory are outside this catalogue's scope.
+**Current commissioning status:** The frontend deployment is READY, but a deployment marked READY is not proof of business go-live. The active Supabase project contains the CMS schema, 23 category records, one published homepage row and one homepage draft row. It currently has no products, product drafts, media records, Storage objects or customer reviews. The media-approval Edge Function is not yet deployed. Real garment photography, verified contact numbers/social accounts, owner-approved policy text, a custom domain, staff-account verification and a tested restore/load plan remain release gates. The sample Plain Sherwani page is clearly marked **DEMO / NOT FOR SALE**. Payments, POS and accurate inventory are outside this catalogue's scope.
 
 ## Features
 
@@ -21,7 +21,7 @@ A mobile-first, browse-and-enquire catalogue for the traditional menswear and ki
 - First-party customer reviews held pending until an authorized staff member moderates them.
 - CMS for editable published garments, permanent server-generated SKU identities, Men/Kids category media, photo auto-labeling, bulk CSV import with optional SKU, owner approval, homepage text, social URL and revision history.
 - Read-only storefront access to published records; restricted Supabase row-level and Storage policies.
-- GitHub Actions typecheck, tests, PostgreSQL permission checks, production build and 18-breakpoint Chromium smoke checks, including live deployments.
+- GitHub Actions typecheck, tests, PostgreSQL permission checks, production build and 18-viewport Chromium smoke checks. CodeQL and Dependabot are configured on the audit branch and become active after merge.
 
 ## Local development
 
@@ -48,11 +48,11 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY
 ## Operating the live CMS
 
 1. In Supabase Auth, provision a verified staff email and assign a server-controlled `app_metadata.nb_role` of `owner`, `admin` or `editor` as appropriate; user metadata does not grant publisher access.
-2. Open **Studio → Website CMS**. Upload and approve media via the Media workflow, select imagery and a compressed brand film, and edit text, profiles or policies.
+2. Open **Studio → Website CMS**. Homepage text/contact fields can be maintained. Media approval is not yet operational: the `nb-media-approval` Supabase Edge Function must first be deployed and tested before uploaded files are approved for publication.
 3. For Instagram, enter the shop owner’s official HTTPS profile in Studio → Website CMS → Footer. Host validation rejects unrelated destinations. **Save draft → Publish website changes**.
 4. Products: choose Men’s/Kids’ category first to reserve NB-SH-00001-style permanent SKU, attach approved photographs, save private draft and publish. Search any live product by SKU, edit details/photos and select **Update published product**. Bulk CSV may leave SKU blank; export generated SKU mapping, assign camera photo batches to a single SKU, approve and match images before publishing.
 5. Review incoming customer feedback under **Customer Reviews**. Public submissions stay pending; approve genuine reviews only.
-6. Review the single Vercel project deployment and the GitHub Actions quality gate before changing production traffic.
+6. Review the single Vercel project deployment, the GitHub Actions quality gate and the Supabase Edge Function status before changing production traffic.
 
 ## Branch policy
 
