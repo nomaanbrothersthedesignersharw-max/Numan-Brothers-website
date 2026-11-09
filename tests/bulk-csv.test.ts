@@ -65,9 +65,9 @@ describe('Catalogue onboarding CSV parser',()=>{
       .toContain('"Invalid ""price"""');
     expect(downloadCsvErrors([{rowNumber:3,sku:'NB-02',message:'=HYPERLINK(1)'}]))
       .toContain('"\'=HYPERLINK(1)"');
-    for(const dangerous of ['\\t=HYPERLINK(1)','\\r+1+1','\\n@SUM(1,2)','\\u0000-1+1','\\uFEFF=1+1']){
+    for(const dangerous of ['\t=HYPERLINK(1)','\r+1+1','\n@SUM(1,2)','\u0000-1+1','\uFEFF=1+1']){
       expect(downloadCsvErrors([{rowNumber:4,sku:'NB-03',message:dangerous}]))
-        .toContain('"\\''+dangerous+'"');
+        .toContain('"' + "'" + dangerous + '"');
     }
   });
 });
