@@ -14,7 +14,7 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
   const [uploading,setUploading] = useState(false);
   const [progress,setProgress] = useState(0);
   const [selection,setSelection] = useState<File[]>([]);
-  const [fileStatuses,setFileStatuses] = useState<{name:string;status:'queued'|'uploading'|'done'|'failed';progress:number;error?:string}[]>([]);
+  const [fileStatuses,setFileStatuses] = useState<{name:string;status:'queued'|'preparing'|'uploading'|'done'|'failed';progress:number;error?:string}[]>([]);
   const [compressionSaved,setCompressionSaved] = useState(0);
   const [busyId,setBusyId] = useState<string|null>(null);
   const [altDrafts,setAltDrafts] = useState<Record<string,string>>({});
@@ -80,11 +80,13 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
         ?{...item,status:'uploading',progress:value}:item));
     };
     try{
-      const results=await runWithConcurrency(files,3,async(file,index)=>{
+      const results=await runWithConcurrency(files,2,async(file,index)=>{
         const asset=await uploadCmsFile(client,file,userId,
           value=>setFileProgress(index,value),{
             department:uploadDept||null,
             categoryPath:uploadCategory||null,
+            onPreparing:()=>setFileStatuses(current=>current.map((item,i)=>i===index
+              ?{...item,status:'preparing',progress:0}:item)),
             onPrepared:info=>{
               preparedSaved+=Math.max(0,info.originalBytes-info.preparedBytes);
               setCompressionSaved(preparedSaved);
@@ -205,7 +207,7 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className="min-w-0 truncate">{file.name}</span>
             <span className={file.status==='failed'?'text-red-700':file.status==='done'?'text-emerald-700':'text-stone-500'}>
-              {file.status==='done'?'Uploaded':file.status==='failed'?'Failed':file.status==='queued'?'Queued':file.progress+'%'}
+              {file.status==='done'?'Uploaded':file.status==='failed'?'Failed':file.status==='queued'?'Queued':file.status==='preparing'?'Optimizing image…':file.progress+'%'}
             </span>
           </div>
           <progress aria-label={'Progress '+file.name} max={100} value={file.progress} className="block w-full"/>
@@ -213,7 +215,7 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
         </li>)}
       </ul>}
       <button type="button" className={primaryClass} onClick={()=>void upload()} disabled={!selection.length || uploading}>
-        <Upload size={16}/>{uploading ? 'Uploading batch ' + progress + '%' : fileStatuses.some(x=>x.status==='failed') ? 'Retry ' + selection.length + ' failed file(s)' : 'Upload selected files'}
+        <Upload size={16}/>{uploading ? (fileStatuses.some(x=>x.status==='preparing')?'Optimizing images…':'Uploading batch ' + progress + '%') : fileStatuses.some(x=>x.status==='failed') ? 'Retry ' + selection.length + ' failed file(s)' : 'Upload selected files'}
       </button>
       {uploading && <progress aria-label="Overall upload progress" max={100} value={progress} className="block w-full"/>}
     </div>
