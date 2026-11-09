@@ -148,7 +148,7 @@ jobs:
         run: node scripts/qa-browser-smoke.mjs
       - name: Retain mobile and desktop screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: storefront-browser-evidence
           path: artifacts/browser/
