@@ -4,6 +4,7 @@ BEGIN;
 -- UPDATE/SELECT policies for the same authenticated role.
 DROP POLICY IF EXISTS nb_media_editor_update_pending ON public.nb_media;
 DROP POLICY IF EXISTS nb_media_publisher_update ON public.nb_media;
+DROP POLICY IF EXISTS nb_media_staff_update ON public.nb_media;
 
 CREATE POLICY nb_media_staff_update ON public.nb_media
   FOR UPDATE TO authenticated
@@ -27,6 +28,7 @@ CREATE POLICY nb_media_staff_update ON public.nb_media
 
 DROP POLICY IF EXISTS nb_reviews_public_read ON public.nb_reviews;
 DROP POLICY IF EXISTS nb_reviews_staff_read ON public.nb_reviews;
+DROP POLICY IF EXISTS nb_reviews_authenticated_read ON public.nb_reviews;
 
 -- Keep the public policy free of staff-only function dependencies.
 -- Authenticated users get one policy that grants the union of public-approved
