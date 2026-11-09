@@ -51,7 +51,7 @@ export default {
       const url=new URL(api+'/rest/v1/nb_products');
       url.searchParams.set(isUuid?'id':isSku?'sku':'slug','eq.'+handle);
       url.searchParams.set('status','eq.published');
-      url.searchParams.set('select','id,slug,sku,title,department,description,fabric,image_urls,price,offer_price,status');
+      url.searchParams.set('select','id,slug,sku,title,department,description,fabric,image_urls,video_url,video_urls,price,offer_price,status');
       url.searchParams.set('limit','1');
       const response=await fetch(url,{headers:{apikey:key,Accept:'application/json'},
         signal:AbortSignal.timeout(10000),redirect:'error'});
