@@ -89,7 +89,7 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
       });
       const uploaded=results.filter((x):x is {ok:true;value:{asset:CmsMediaRow;approved:boolean}}=>x.ok)
         .map(x=>x.value);
-      const failed=results.filter(x=>!x.ok);
+      const failed=results.filter((x):x is {ok:false;error:unknown}=>x.ok===false);
       const approvedUrls=uploaded.filter(x=>x.approved).map(x=>mediaPublicUrl(x.asset.storage_path));
       let next=[...selected];
       if(multiple)next=[...new Set([...next,...approvedUrls])];
@@ -98,7 +98,7 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
       const pending=uploaded.filter(x=>!x.approved).length;
       if(failed.length){
         const first=failed[0];
-        const reason=first&&!first.ok
+        const reason=first
           ?(first.error instanceof Error?first.error.message:'Upload failed.'):'Upload failed.';
         setError(uploaded.length+' file(s) uploaded; '+failed.length+' failed. Retry the failed file(s). '+reason);
       }
