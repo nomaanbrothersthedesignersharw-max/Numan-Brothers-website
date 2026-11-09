@@ -6,7 +6,7 @@
 
 1. Sign into the client's chosen Supabase project and confirm there are **no existing Noman `nb_*` tables or `nb-media*` buckets**. A new organization is not required, only the correct project.
 2. Open the repository's `supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql` on the final `main` commit. Click **Raw**, copy the **entire** file, including `BEGIN;` and final `COMMIT;`. Never paste the Markdown explanatory text or a single `-` comment prefix.
-3. In the **same** Supabase project's **SQL Editor**, paste and run the single script. It installs **17 reviewed migrations**, in order and in one transaction: 15 `nb_*` tables, 3 media buckets, category taxonomy, Auth role-gates, RLS, audit history, product CRUD publishing, SKU counters, media reference safety and performance indexes.
+3. In the **same** Supabase project's **SQL Editor**, paste and run the single script. It installs **18 reviewed migrations**, in order and in one transaction: 15 `nb_*` tables, 3 media buckets, category taxonomy, Auth role-gates, RLS, audit history, product CRUD publishing, SKU counters, media reference safety and performance indexes.
 4. It deliberately **does not create any Auth users or passwords**, fake inventory, images or videos. It also cannot deploy Edge Function TypeScript or configure Vercel.
 5. The script refuses a pre-existing Noman installation. An error rolls back its transaction; do **not** skip failing statements or use `DROP TABLE` on a client project to force success.
 6. Run `supabase/sql-editor/NOMAN_BROTHERS_VERIFY_READ_ONLY.sql` and confirm 15 tables, RLS, expected published-only functions and 3 buckets.
