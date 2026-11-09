@@ -2438,6 +2438,7 @@ $guard$;
 -- 20 / 20: 20261109230000_move_pg_trgm_extension.sql
 -- Source: supabase/migrations/20261109230000_move_pg_trgm_extension.sql
 -- =============================================================================
+CREATE SCHEMA IF NOT EXISTS extensions;
 -- Supabase recommends keeping extensions outside the exposed public schema.
 -- pg_trgm is relocatable; moving its objects does not rebuild or drop the
 -- existing GIN indexes. This is safe for an already-populated catalogue.
@@ -2452,9 +2453,7 @@ BEGIN
   IF current_schema IS NULL THEN
     RAISE EXCEPTION 'pg_trgm extension is required by the catalogue indexes';
   ELSIF current_schema='public' THEN
-    IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname='extensions') THEN
-      RAISE EXCEPTION 'Supabase extensions schema is missing';
-    END IF;
+    -- The schema is created above for local PostgreSQL test parity.
     EXECUTE 'ALTER EXTENSION pg_trgm SET SCHEMA extensions';
   ELSIF current_schema <> 'extensions' THEN
     RAISE EXCEPTION 'pg_trgm is installed in unexpected schema: %', current_schema;
