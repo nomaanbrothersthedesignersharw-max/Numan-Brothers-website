@@ -133,19 +133,12 @@ jobs:
             sleep 1
           done
           node scripts/qa-browser-smoke.mjs
-      - name: Test live customer website after main deploy
+      - name: Test live storefront and same-origin Studio after main deploy
         if: github.ref == 'refs/heads/main'
         env:
           NODE_PATH: /tmp/nb-browser/node_modules
           NB_MODE: live
-          NB_TEST_URL: https://numan-brothers-website.vercel.app
-        run: node scripts/qa-browser-smoke.mjs
-      - name: Test live Studio deployment after main deploy
-        if: github.ref == 'refs/heads/main'
-        env:
-          NODE_PATH: /tmp/nb-browser/node_modules
-          NB_MODE: live
-          NB_TEST_URL: https://numan-brothers-cms-showroom.vercel.app
+          NB_TEST_URL: https://numan-brothers-website-nine.vercel.app
         run: node scripts/qa-browser-smoke.mjs
       - name: Retain mobile and desktop screenshots
         if: always()
