@@ -41,6 +41,15 @@ describe('client-owned CMS handoff',()=>{
     expect(ui).toContain('photoCategory');
     expect(ui).toContain('Download product SKUs for photo labels');
   });
+  test('restricts SKU counter table grants to authenticated staff operations',()=>{
+    const migration=source('supabase/migrations/20261109210000_sku_counter_least_privilege.sql');
+    expect(migration).toContain('REVOKE ALL PRIVILEGES ON TABLE public.nb_sku_counters FROM anon');
+    expect(migration).toContain('REVOKE ALL PRIVILEGES ON TABLE public.nb_sku_counters FROM authenticated');
+    expect(migration).toContain('GRANT SELECT, INSERT, UPDATE ON TABLE public.nb_sku_counters TO authenticated');
+    expect(migration).toContain("has_table_privilege('anon','public.nb_sku_counters','TRUNCATE')");
+    expect(migration).toContain("has_table_privilege('authenticated','public.nb_sku_counters','DELETE')");
+    expect(migration).toContain("policyname='nb_sku_counter_staff'");
+  });
   test('keeps admin bootstrap strictly separate from customer passwords and live installer',()=>{
     const install=source('supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql');
     const owner=source('supabase/sql-editor/NOMAN_BROTHERS_ASSIGN_OWNER_AFTER_AUTH.sql');
