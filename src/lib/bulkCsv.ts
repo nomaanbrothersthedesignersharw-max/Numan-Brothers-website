@@ -18,7 +18,7 @@ export interface CsvRow {
 const categoryPaths=new Map(COLLECTION_ROUTES.map(c=>[c.path,c.department]));
 
 export function parseCsv(text:string):string[][] {
-  const source=text.replace(/^\\uFEFF/,'');
+  const source=text.replace(/^\uFEFF/,'');
   const rows:string[][]=[];let row:string[]=[];let cell='';let quoted=false;let quoteClosed=false;
   const finishCell=()=>{row.push(cell);cell='';};
   const finishRow=()=>{
@@ -37,8 +37,8 @@ export function parseCsv(text:string):string[][] {
     }
     if(quoteClosed){
       if(char===','){finishCell();quoteClosed=false;}
-      else if(char==='\\n'||char==='\\r'){
-        if(char==='\\r'&&source[i+1]==='\\n')i++;
+      else if(char==='\n'||char==='\r'){
+        if(char==='\r'&&source[i+1]==='\\n')i++;
         finishRow();quoteClosed=false;
       }else if(char!==' '&&char!=='\\t'){
         throw new Error('Unexpected character after a closing CSV quote');
@@ -49,8 +49,8 @@ export function parseCsv(text:string):string[][] {
       if(cell.trim())throw new Error('Quote found in the middle of a CSV field');
       quoted=true;
     }else if(char===',')finishCell();
-    else if(char==='\\n'||char==='\\r'){
-      if(char==='\\r'&&source[i+1]==='\\n')i++;
+    else if(char==='\n'||char==='\r'){
+      if(char==='\r'&&source[i+1]==='\\n')i++;
       finishRow();
     }else cell+=char;
   }
