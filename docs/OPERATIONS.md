@@ -1,64 +1,79 @@
 # Nomaan Brothers — Operations, Security and Recovery
 
-This guide applies to a **dedicated client-owned Supabase project** and its own Vercel deployment. The connected project named `gym` is an unrelated app and must never be used.
+This runbook describes the currently connected Nomaan Brothers website architecture. It is intentionally specific to the deployed project; do not apply instructions from an unrelated Supabase or Vercel project.
+
+## Audited service map
+
+Audit date: 2026-11-09.
+
+- **Source:** `nomaanbrothersthedesignersharw-max/Numan-Brothers-website`, default branch `main`. The repository is now standalone (not a GitHub fork).
+- **Hosting:** one Vercel project, `numan-brothers-website`, using Vite. Its verified Vercel domain is `https://numan-brothers-website-nine.vercel.app`; Studio lives at `/studio` on the same origin. There is no separate CMS Vercel project and no custom domain attached.
+- **Runtime:** Vercel Node.js 22.x. Preview deployments are SSO-protected; Production is not SSO-protected so customers can browse it.
+- **Database:** Supabase project `uinhybkdzevpxnugtvzf`, region `us-east-1`, PostgreSQL 17.11. The Production Vite variables target this same project, and the Vercel publishable key was checked against the active Supabase publishable key without disclosing the key.
+- **Database contents at audit:** 15 application tables with RLS enabled, 23 categories, two confirmed Auth users, one published homepage row and one homepage draft row. There are no product rows/drafts, media metadata/storage objects or reviews. The published homepage has contact details configured; this runbook deliberately does not copy those values.
+- **Migrations:** the source tree contains 16 ordered migrations, but Supabase's migration-history API currently reports no applied migration rows. The schema exists, so it must be treated as an SQL Editor-installed database until a schema diff and migration-ledger reconciliation are completed. Do not rerun the fresh-project installer against this database.
+- **Functions:** no Supabase Edge Functions are currently deployed. The source includes `nb-media-approval`; media review/approval/revocation workflows must not be treated as operational until that function is deployed and exercised with real owner/admin accounts.
+- **Plan and regional note:** the connected Vercel team is on Hobby. Confirm an eligible commercial hosting plan before using Vercel for this commercial showroom. Supabase is in US East and Vercel functions currently use IAD1; measure India user latency before changing either region.
+
+The earlier Supabase project ref `xiidzpsyuvfhyjudrrfq` is not accessible to the current connected Supabase account. Do not assume it was deleted or move data from it without confirming its owner, backups and contents.
 
 ## People and roles
 
-- Client owner owns accounts, domain and billing. AGM has least-privilege collaborator access and provides source maintenance.
-- `app_metadata.nb_role` is set by a privileged Auth administrator; staff cannot grant themselves roles using browser-user metadata. Editors prepare drafts; admins/owner approve/publish. Avoid shared accounts.
-- For staff offboarding: revoke sessions, remove privileged role, rotate any shared credentials used outside Supabase, review recent revision/import actions. JWT claims may be cached until token expiry; test access removal against a real session.
-- Restrict Supabase and Vercel dashboard team permissions; enforce MFA where available.
+- The business owner controls domain, billing and owner credentials. Give collaborators the minimum access they need; require MFA where available.
+- Staff roles are assigned only through Supabase Auth `app_metadata.nb_role`: `owner`, `admin` or `editor`. User-editable metadata does not grant publishing privileges.
+- Editors prepare drafts. Owner/admin roles approve media and publish content. Do not share staff accounts.
+- For offboarding, revoke sessions, remove the privileged role, review recent revisions/imports and test that a previously issued session no longer grants access.
 
-## Backup strategy and restore drill
+## Database safety and migration discipline
 
-1. Choose backup cadence and retention for the client's Supabase plan; document actual provider capabilities. Verify backups include the database and independently archive original uploaded media objects; a DB dump alone does **not** restore Storage bytes.
-2. Before migrations, export the schema, catalogue data, auth-user references and Storage object inventory to client-controlled encrypted storage. Protect PII and object URLs; no backups in Git.
-3. Test restore to a **separate staging project**. Verify foreign keys, row counts, product-media mapping, private/public bucket objects and owner Auth re-provisioning without overwriting production.
-4. Record restore time, backup timestamp, API health, publish revision count and restore errors. Only a passed drill satisfies the release gate.
-5. Make forward-only SQL migrations for databases that have already received previous migrations; never edit applied history or silently replay a changed initial SQL file.
+1. Keep the existing project as the source of truth until a reviewed backup and migration plan explicitly replaces it.
+2. Before any DDL, export schema and data to client-controlled encrypted storage and confirm a separate recovery point. Never store backups or credentials in Git.
+3. Apply forward-only migrations in staging first. Test with anonymous, editor, admin, owner and revoked identities. Verify RLS, grants, triggers, publishing RPCs and storage policies.
+4. Do not remove unused indexes on an empty/low-traffic project based only on the advisor. Reassess after real query volume and representative EXPLAIN plans.
+5. Reconcile the currently empty Supabase migration ledger only after comparing the live schema with the source installer. Do not mark migrations applied merely because the table names exist.
+6. The Supabase advisor currently reports leaked-password protection disabled, `pg_trgm` installed in `public`, and two pairs of overlapping permissive policies. Review these against the running schema before changing Auth settings, moving the extension or consolidating policy predicates.
 
 ## Media lifecycle and reconciliation
 
-- New files upload to private `nb-media-staging` and receive a DB `nb_media` row.
-- The owner/admin Edge Function verifies a **fresh** Auth role, copies approved objects into public `nb-media-public`, and marks the metadata approved.
-- File copy and SQL update are not a single atomic transaction. On failures, flag and reconcile: (1) uploaded object without metadata; (2) public object without approved metadata; (3) approved metadata with missing public copy; (4) revoked image still cached externally.
-- Review referenced published product associations before revoking/deleting media. Avoid deleting referenced garment photos.
-- A previous `nb-media` public bucket is changed to private for clean installs; existing files require an **audited asset backfill**. Phase 2 deliberately blocks automatic conversion if previously published product/media records exist.
+- User uploads should remain in private `nb-media-staging`; only approved files should be copied to public `nb-media-public`.
+- The source `nb-media-approval` Edge Function verifies a fresh Auth identity and owner/admin role before privileged storage work. It is **not deployed** in the audited project yet.
+- Deploy only after reviewing the function, matching migration/storage policies and testing it with a non-production asset and real owner/admin credentials.
+- Storage object copies and database updates are not one atomic transaction. Reconcile uploads without metadata, public copies without approved metadata, approved metadata without public copies, and failed revocations.
+- Do not revoke/archive/delete an asset still referenced by a published product, collection, homepage or saved draft. Replace, save and publish references first.
 
-## CSV/import lifecycle
+## CSV and import lifecycle
 
-- Jobs record a stable file fingerprint, creator, total, processed/imported/skipped/error counts, and per-row audit entries. Do not run the same CSV concurrently.
-- CSV draft identities are deterministic per job/row; on retry the importer recognizes its existing draft even if the row-audit insert failed. Image batch paths are also deterministic, allowing recovery of prior uploaded Storage objects and missing metadata. This reduces duplicates but does **not** make Storage and SQL writes atomic. Inspect the job/audit state after browser interruption, concurrent-session conflict or quota errors.
-- Import fingerprints are scoped to each authenticated staff member. Two employees can process the same source file without sharing mutable job records.
-- Interrupted multipart/TUS transfers may still require manual reconciliation of incomplete upload sessions or expiry. Do not promise background processing after a browser tab is closed.
-- SKU matching only attaches approved assets to empty draft galleries and never publishes them.
-- Examine failed-row report; do not blindly retry huge batches on authentication/quota errors.
-- Validate and monitor Storage size, bandwidth, PostgREST limits, per-query response time, file upload success/timeout rate and Supabase billing.
+- CSV imports are limited to 8 MB and 10,000 rows. Generated SKUs are permanent identities; do not reuse a SKU after a failed or abandoned draft.
+- Treat imports as resumable but not atomic across browser, database and storage. Inspect the import job and row audit after interruption before retrying.
+- Error-report CSV fields must be formula-neutralized before opening in spreadsheet software.
+- Confirm duplicate detection, malformed quoting, category/department matching, generated SKU mapping and image matching using staged data before a large import.
 
-## Published media revocation
+## Deployment and change control
 
-- Media approval/revocation uses a privileged Edge Function that refreshes the owner's role from Auth rather than trusting a stale browser JWT.
-- A currently published product gallery, video, homepage or category banner blocks removal of its public asset. Editors must first replace references and publish the updated content. Stale CDN copies may remain externally cached for a limited period.
-- Reconcile partial public-copy/metadata failures before declaring approval or revocation complete.
+1. Develop on a short-lived branch and open a pull request. Never commit directly to `main` for production changes.
+2. Required CI includes TypeScript, unit/regression tests, PostgreSQL security tests, build, responsive Chromium tests and live public URL smoke checks. Verify the exact commit has a green run before merge.
+3. Protect `main` in GitHub: require the quality workflow, disallow force pushes and restrict bypass. Current GitHub connector access cannot read or configure branch protection; a repository administrator must verify it in GitHub Settings.
+4. Keep `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` as the only browser-facing Supabase credentials. Never place service-role, secret or database credentials in a `VITE_*` variable.
+5. Preview should use a separate staging backend. Do not copy production publishable configuration into a preview if the preview could create or update production content.
+6. Before promoting, verify the domain, build output, sitemap, robots, response status, Studio access, RLS, storage upload/approval/publish flow and rollback target.
+7. A Vercel rollback reverts code, not database migrations. Maintain a migration rollback/forward-fix plan separately.
 
-## Deployment/change control
+## Backup strategy and restore drill
 
-1. Keep PRs draft until tests pass and code is reviewed. Preserve prior Vercel production deployment as rollback candidate; do not auto-build a Vercel preview for each push.
-2. Confirm client Supabase ref and owner-approved domain before setting Vercel environment variables. `VITE_` values are browser-visible; never use service-role or secret keys there. Server-only secrets belong in Supabase Edge Function runtime, never source code.
-3. Confirm migrations/Storage/Edge Functions deployed to client staging and real user permission tests. Run `EXPECTED_SUPABASE_PROJECT_REF=...` plus `node scripts/check-client-cms.mjs` and `node scripts/smoke-deployment.mjs https://STAGING_ORIGIN`.
-4. Test real Vercel response statuses/HTML/sitemap and the admin UI before approving production. If a staging URL uses Vercel Authentication, access it via authorized Vercel tooling; do not remove protection just to satisfy automation.
-5. Release only after `docs/RELEASE_ACCEPTANCE.md` has all real evidence and signoffs. Production deployment is a separate controlled operation; `main` remains protected and Vercel deployment gates prevent unintended promotions.
-6. Monitor request/runtime errors and client-reported issues after release. Roll back the Vercel deployment if needed, but note that rolling back code **does not automatically roll back database migrations**.
+1. Document database backup cadence/retention for the actual Supabase plan.
+2. Back up Storage objects independently; a database backup does not include the actual Storage file bytes.
+3. Restore a backup to a separate project and verify row counts, RLS, auth identities, product/media associations and bucket objects.
+4. Record restore time, backup timestamp, API health, migration version and reconciliation errors. A restore drill is not complete until media bytes are also verified.
 
 ## Incident handling
 
-- **Unauthorized access:** disable/revoke identity, inspect Auth logs, history/asset changes, backups and sharing links. Rotate server credentials if compromise is suspected.
-- **Wrong store backend:** stop deployment; verify client project ref and env/preview scope. Never copy production data between clients without approval.
-- **Missing products:** check publish status, category routes, RLS, migration history and API failures. Avoid adding fake sample merchandise.
-- **Upload stuck:** check Storage bucket policies, TUS endpoint, file size limit, Auth expiry and orphan job records.
-- **Search results missing:** verify table indexes, valid published status, category membership and server pagination. Distinguish application error from legitimately empty categories.
-- **SEO missing:** inspect live HTTP page source instead of only browser DOM; test product function packaging, sitemap, robots and canonical URL.
+- **Wrong backend:** stop a release and verify the project ref in Vercel Production and the Supabase dashboard. Do not copy customer data without explicit owner approval.
+- **Unauthorized access:** revoke identity/session, inspect Auth/audit logs, review data/media revisions and rotate server credentials if compromise is suspected.
+- **Missing media:** inspect Storage objects, media metadata, approval status, published references and Edge Function logs before attempting a retry.
+- **Missing products:** verify published status, active category paths, RLS and API errors. Never substitute demo products as live inventory.
+- **Slow catalogue:** inspect query plans, PostgREST request timings, index usage, image sizes, CDN cache and client-side duplicate requests before scaling database compute.
+- **SEO failure:** test actual HTTP HTML/status for category and product routes, canonical URLs, robots, sitemap and JSON-LD.
 
 ## Handover checklist
 
-Provide the client with their repo, environment-variable **names** and where to retrieve public values, staff login method, CMS user guide, backup responsibilities, operations contact, exact release SHA and instructions for future migrations. Never hand over an agency-wide secret or password.
+Give the owner their repository, Vercel/Supabase ownership, domain registrar access, staff provisioning instructions, public environment-variable names, migration/runbook, backup responsibility, exact release SHA, rollback plan and support contact. Never hand over an agency-wide secret or put credentials in chat.
