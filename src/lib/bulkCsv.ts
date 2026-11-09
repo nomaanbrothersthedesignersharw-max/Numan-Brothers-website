@@ -38,9 +38,9 @@ export function parseCsv(text:string):string[][] {
     if(quoteClosed){
       if(char===','){finishCell();quoteClosed=false;}
       else if(char==='\n'||char==='\r'){
-        if(char==='\r'&&source[i+1]==='\\n')i++;
+        if(char==='\r'&&source[i+1]==='\n')i++;
         finishRow();quoteClosed=false;
-      }else if(char!==' '&&char!=='\\t'){
+      }else if(char!==' '&&char!=='\t'){
         throw new Error('Unexpected character after a closing CSV quote');
       }
       continue;
@@ -50,7 +50,7 @@ export function parseCsv(text:string):string[][] {
       quoted=true;
     }else if(char===',')finishCell();
     else if(char==='\n'||char==='\r'){
-      if(char==='\r'&&source[i+1]==='\\n')i++;
+      if(char==='\r'&&source[i+1]==='\n')i++;
       finishRow();
     }else cell+=char;
   }
@@ -110,7 +110,7 @@ export function downloadCsvErrors(rows:{rowNumber:number;sku:string;message:stri
   // Quoting alone does not prevent CSV formula injection in spreadsheet apps.
   const esc=(value:string|number)=>{
     const text=String(value);
-    const safe=/^[\\t\\r\\n ]*[=+@-]/.test(text)?"'"+text:text;
+    const safe=/^[\u0000-\u0020\u007f\uFEFF]*[=+\-@]/.test(text)?"'"+text:text;
     return '"'+safe.replace(/"/g,'""')+'"';
   };
   return ['row,sku,error',...rows.map(x=>[x.rowNumber,x.sku,x.message].map(esc).join(','))].join('\r\n');
