@@ -1,113 +1,56 @@
-# Noman Brothers — Copy/paste Supabase SQL Editor installation
+# Noman Brothers — current copy/paste SQL installation
 
-> **Current project already installed (7 November 2026):** The live Noman Supabase project `zazdxmukmcayblsteulk` already has CMS tables, an administrator, and the media Edge Function. **DO NOT run this fresh-project installer on the live project.** It is only for a brand-new, empty, separate client-owned project. The original nine migrations were installed through SQL Editor; the three later enhancements were applied as tracked Supabase migrations. Reconcile this mixed migration history before future CLI pushes. See [Website CMS guide](./WEBSITE_CMS_OPERATIONS_AND_ROADMAP.md).
+**Choose one Supabase project before doing anything.** The client-owned Vercel environment variable `VITE_SUPABASE_URL` identifies the project that receives Auth, tables, and media. If another organization/project exists, it does not conflict automatically; the wrong paired URL/key or migrations in a different project are what break CMS access. Do not delete accounts or production data to troubleshoot.
 
+## Path A — truly fresh project (one paste)
 
-**Target new project:** `zazdxmukmcayblsteulk`  
-**Project API origin (public):** `https://zazdxmukmcayblsteulk.supabase.co`  
-**Supabase Dashboard:** https://supabase.com/dashboard/project/zazdxmukmcayblsteulk
+1. Sign into the client's chosen Supabase project and confirm there are **no existing Noman `nb_*` tables or `nb-media*` buckets**. A new organization is not required, only the correct project.
+2. Open the repository's `supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql` on the final `main` commit. Click **Raw**, copy the **entire** file, including `BEGIN;` and final `COMMIT;`. Never paste the Markdown explanatory text or a single `-` comment prefix.
+3. In the **same** Supabase project's **SQL Editor**, paste and run the single script. It installs **16 reviewed migrations**, in order and in one transaction: 15 `nb_*` tables, 3 media buckets, category taxonomy, Auth role-gates, RLS, audit history, product CRUD publishing, SKU counters, media reference safety and performance indexes.
+4. It deliberately **does not create any Auth users or passwords**, fake inventory, images or videos. It also cannot deploy Edge Function TypeScript or configure Vercel.
+5. The script refuses a pre-existing Noman installation. An error rolls back its transaction; do **not** skip failing statements or use `DROP TABLE` on a client project to force success.
+6. Run `supabase/sql-editor/NOMAN_BROTHERS_VERIFY_READ_ONLY.sql` and confirm 15 tables, RLS, expected published-only functions and 3 buckets.
 
-This installation bundle matches the **twelve versioned** Noman Brothers CMS migrations in `supabase/migrations/`. It creates the full fresh-project catalogue CMS schema. **Only run the installer on a new, empty, dedicated Noman Brothers project.** The live Noman project has passed its read-only inventory audit and has its admin role and Edge Function set up. Do not reinstall its schema.
+## Path B — you already created all 15 tables
 
-## 1. Confirm project before writing anything
+If the client project already contains **all 15 Noman `nb_*` tables**, back it up, inspect schema and existing rows, then use `supabase/sql-editor/NOMAN_BROTHERS_COMPLETE_EXISTING_TABLES.sql` to reconcile its remaining migrations. This SQL path is designed for a Noman installation in the intended schema, **not** for a half-written unrelated schema. Review exact errors; never apply both installers to one project.
 
-1. Open the Supabase dashboard URL above and check that the name is Noman Brothers and the project reference is exactly `zazdxmukmcayblsteulk`. Confirm you are a project owner/editor and that this is an **empty** project for the new website.
-2. If the project already has `nb_*` tables, functions, triggers, or `nb-media*` Storage buckets, **STOP**. Do not paste the installer onto a partially configured or live site. Send a redacted table inventory/error message instead; create and review forward-only migrations.
-3. Leave the existing `gym` project, the old Firebase deployment, and all other websites unchanged.
+## Owner Auth role — the second, separate SQL paste
 
-## 2. One copy/paste into Supabase SQL Editor
+1. In **Authentication → Users**, create the real owner account with their confirmed Gmail and strong password. Supabase Auth handles password hashing and email confirmation. Do **not** use SQL `INSERT INTO auth.users` or plaintext passwords.
+2. Open `supabase/sql-editor/NOMAN_BROTHERS_ASSIGN_OWNER_AFTER_AUTH.sql`. Replace its `owner_email` placeholder with the exact confirmed email and paste it into the **same** project's SQL Editor.
+3. The script checks that the Auth user exists, has a confirmed email and that no other user currently holds a privileged CMS role. It assigns `raw_app_meta_data.nb_role='owner'` without overwriting other metadata. It refuses ambiguous or missing users. You can safely repeat it for the same verified account.
+4. Sign out of Studio, then sign back in. The role must appear in the renewed Supabase JWT and cannot be changed by the public site.
 
-1. Open `supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql` in the GitHub repository on the `main` branch. Use **Raw** and **Copy** to get the entire file (the complete latest source file); do not copy only a GitHub preview fragment.
-2. Go to **Supabase → SQL Editor → New query** for project `zazdxmukmcayblsteulk`.
-3. Paste the entire file, including the leading `BEGIN;`, the twelve numbered sections, final assertions, and `COMMIT;`.
-4. Click **Run** once. The file creates all application schema objects in a **single transaction**. If a statement fails, the transaction is not committed; **do not skip that statement**, drop existing tables to force success, or rerun on a populated schema.
-5. Expect a success notification and a PostgreSQL NOTICE roughly describing 13 RLS-enabled tables, 35+ policies, and three buckets. Do not assume success unless the query actually completes.
+**Important:** Owner email/password are **not** credentials for the Supabase organization Dashboard. They are Supabase **Auth user credentials** for `/studio`; the Dashboard owner separately controls billing and infrastructure. Protect both.
 
-**Contents in order:**
+## Edge Function — separate required deployment
 
-1. `20261107060000_nomaan_cms.sql` — product/category entities, Auth roles, private drafts, homepage, approved publish procedures.
-2. `20261107130000_catalogue_private_media.sql` — 2 private/public media buckets plus legacy private bucket, media associations, paging/search indexes.
-3. `20261107150000_studio_product_index.sql` — bounded staff product index.
-4. `20261107170000_bulk_import_jobs.sql` — staff import job/row records and RLS.
-5. `20261107172000_match_approved_media.sql` — SKU-to-photo matching.
-6. `20261107195000_studio_index_role_gate.sql` — secure view permissions.
-7. `20261107199000_import_owner_idempotency.sql` — importer fingerprint isolation.
-8. `20261107210000_catalogue_integrity_audit.sql` — immutable event audit, media revocation protections, catalogue health.
-9. `20261107223000_category_media_publish_guard.sql` — reject unapproved collection banner art.
-10. `20261107234500_cms_archive_and_discard.sql` — guard product archive and private draft discard.
-11. `20261107235900_catalogue_media_merchandising.sql` — category SKUs, offer pricing, tailoring, classified media and archiving.
-12. `20261108001500_home_media_security.sql` — safe new homepage imagery and video publishing.
-
-The fresh schema creates **13 application tables**, RLS policies, indexes, Storage bucket definitions, SQL functions, SQL triggers and fixed men/kids navigation categories. It **does not** invent garment products, payment records, customers, photos, videos, stock quantities or prices.
-
-## 3. Copy/paste a read-only post-install check
-
-Open `supabase/sql-editor/NOMAN_BROTHERS_VERIFY_READ_ONLY.sql`, paste it into a **new** SQL Editor query in the **same project**, and run. It checks table RLS, critical SQL RPCs, storage bucket privacy, protected internal schema and staff view.
-
-You can also inspect manually:
-- **Table Editor:** `nb_categories`, `nb_products`, `nb_product_drafts`, `nb_product_revisions`, `nb_media`, `nb_home_drafts`, `nb_home_public`, `nb_home_revisions`, `nb_product_categories`, `nb_product_media`, `nb_import_jobs`, `nb_import_rows`, `nb_audit_events`.
-- **Storage:** `nb-media-staging` (**Private**), `nb-media-public` (**Public**, *approved only*), `nb-media` (**Private** legacy).
-- **Database → Advisors:** resolve applicable Security Advisor and Performance Advisor warnings. The Inventory query does not substitute for real Auth, RLS and Storage API tests.
-
-Do not run files under `tests/sql/assert*.sql` inside the client project's SQL Editor: those are test fixtures that deliberately write synthetic records and change assumed security roles.
-
-## 4. Deploy the protected media Edge Function — required
-
-SQL Editor cannot deploy JavaScript/Deno Edge Functions. Without this step, owner/admin **image/video approval will not work**.
-
-Open `supabase/functions/nb-media-approval/index.ts`. In Supabase **Edge Functions**, deploy a function named exactly `nb-media-approval` using its reviewed source or the CLI:
+The CMS uses `supabase/functions/nb-media-approval/index.ts` for authorized media approval, revocation, archive and hard delete. Deploy that function to the **same** client project (JWT required):
 
 ```bash
 supabase login
-supabase link --project-ref zazdxmukmcayblsteulk
-supabase functions deploy nb-media-approval --project-ref zazdxmukmcayblsteulk
+supabase link --project-ref YOUR_CLIENT_PROJECT_REF
+supabase functions deploy nb-media-approval --project-ref YOUR_CLIENT_PROJECT_REF
 ```
 
-Keep JWT verification enabled. The function validates the signed-in user's freshly fetched `app_metadata.nb_role` before copying privately uploaded assets to public delivery. Supabase manages the function's server-side credentials. Never paste a Supabase `sb_secret_*` or `service_role` key into a browser/Vite variable.
+A successful SQL script without this function does **not** make media approval work.
 
-After deployment, test owner approval, editor rejection and anonymous rejection with a real staged asset. Publishing private photos without first approving the media must fail.
+## Vercel — match both environment variables
 
-## 5. Create the real CMS owner
-
-In the **same** Supabase project, open **Authentication → Users** and invite/create an owner using the real store owner's email. After they exist, assign `app_metadata.nb_role = "owner"` through the Auth Admin API, or follow `docs/OWNER_ROLE_SQL_TEMPLATE.sql` in the *same* project's SQL Editor. Replace its email placeholder and confirm the correct account.
-
-The SQL owner-role template will throw an error if the placeholder is unchanged or the Auth user doesn't exist exactly once.
-
-The user signs out/in to refresh the access token. `editor` can upload and draft; `admin` and `owner` can approve and publish. Public sign-up isn't required. Do not share Gmail passwords, temporary codes, or private API keys with AGM.
-
-## 6. Vercel — only two **public** frontend variables
-
-AGM created a **separate** Vercel project named `numan-brothers-cms-showroom` so the original Firebase production deployment remains untouched.
-
-The public URL `VITE_SUPABASE_URL=https://zazdxmukmcayblsteulk.supabase.co` has already been entered into Vercel project Production/Preview settings. The live projects already have this key configured. On a new client project, set that project's **publishable** key:
+Under the client's Vercel project Settings → Environment Variables (Production), configure:
 
 ```dotenv
-VITE_SUPABASE_URL=https://zazdxmukmcayblsteulk.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_<EXACT_PUBLIC_KEY_FROM_NOMAN_SUPABASE>
+VITE_SUPABASE_URL=https://YOUR_CLIENT_PROJECT_REF.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_EXACT_KEY_FROM_THAT_PROJECT
 ```
 
-Find the publishable key in **Supabase → Project Settings → API Keys** for `zazdxmukmcayblsteulk`. A publishable key is intended for public browser access **only after correct RLS tests**. Do **not** provide the project database password, user session tokens, secret key, or service-role key.
+Never put a `service_role` key, `sb_secret_*` key or password in `VITE_*`. Rebuild/redeploy Production after changing these variables—Vite embeds them into browser JavaScript when it builds. For previews use a separate test database or avoid exposing production data.
 
-Save the publishable key under the Vercel project's **Production** environment. Vite embeds both variables at **build time**, so **create one fresh production deployment** of the reviewed release after both keys are present; an existing review deployment will not update itself.
+## Operational integrity checks
 
-**Current review website:** https://numan-brothers-cms-showroom-agm-3137.vercel.app/  
-**CMS Studio URL:** https://numan-brothers-cms-showroom-agm-3137.vercel.app/studio
+Use `docs/CLIENT_ONBOARDING.md` for the complete handoff and product-creation steps, including SKU batch import, photo matching, independently detached client GitHub repository, and the final acceptance checklist. Existing SKU examples are `NB-SH-00001`, `NB-SU-00001`. Sherwani has **Plain Sherwani** and **Handwork Sherwani**; Suits has **Plain Suits** and **Handwork Suits**.
 
-The preview is a **review build** and the CMS shows **CMS not connected** until a full production build uses the real values.
+**Migration history warning:** Running a copy/paste SQL bundle does not insert corresponding version entries in `supabase_migrations.schema_migrations`. Do not subsequently `supabase db push` onto that project until history is reconciled. Prefer versioned CLI migrations from day one if you plan ongoing engineering work. The fresh installer and the individual CLI migrations are *alternative installation paths*, not steps to stack on top of each other.
 
-## 7. Acceptance — test both sides
-
-1. On `/studio`, sign in as the owner (must not show "CMS not connected").
-2. Upload a genuine licensed photograph and a short supported MP4/WebM video; verify private previews cannot be fetched anonymously.
-3. Approve media as owner/admin using `nb-media-approval`; confirm editor/visitor cannot approve.
-4. Draft an actual product SKU + category + approved gallery, check that it is not publicly visible, then publish version 1.
-5. Verify its public product page, category card, photo-synced blur, WhatsApp enquiry and video playback.
-6. Edit and publish homepage version 1, add authorized category banner and verified owner contact; confirm the public site updates without redeploying React.
-7. Test anonymous RLS, 10k product/page benchmarks, bulk CSV recovery, real URL SSR/SEO, backup and Storage restoration.
-8. Only after security, performance, and owner acceptance, enable public indexing for the final verified domain and promote the actual production deployment.
-
-## IMPORTANT: SQL Editor vs migrations history
-
-Supabase officially recommends the CLI-migration workflow for teams because SQL Editor does **not** register these twelve files in `supabase_migrations.schema_migrations`. If you use this one-shot SQL Editor installation, **do not later run `supabase db push` on this same project without reconciling migration history**. The safe route is to run the versioned migrations via CLI instead of pasting the bundle. If you have already used SQL Editor, verify all schema changes and follow the documented `supabase migration repair` process with exact migration IDs; never blindly mark missing migrations as applied.
-
-The SQL script's bundled transaction and postflight checks are intended to prevent a half-installed *empty project*; they are **not** a substitute for real hosted Auth, Storage, client session, and video tests.
+**No SQL installer, simulated permissions test, or health probe can guarantee complete production readiness.** Verify real Auth role, Storage, media upload, product publish/update, bulk photo matching, SEO, backup/restore, performance and business-owned content with the client before account cleanup.

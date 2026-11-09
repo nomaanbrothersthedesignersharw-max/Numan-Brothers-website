@@ -42,7 +42,8 @@ describe('editorial CMS and customer-trust changes',()=>{
    expect(SAMPLE_SHERWANI.originalPrice).toBeUndefined();
    expect(SAMPLE_SHERWANI.description).toContain('NOT FOR SALE');
    expect(source('src/App.tsx')).toContain('<meta name="robots" content="noindex, nofollow"/>');
-   expect(source('src/components/studio/CmsProducts.tsx')).toContain('Prepare editable sherwani draft');
+   expect(source('src/components/studio/CmsProducts.tsx')).not.toContain('Prepare editable sherwani draft');
+   expect(source('src/components/studio/CmsProducts.tsx')).toContain('Update published product');
  });
  test('reviews stay pending and require an administrator to publish',()=>{
    const sql=source('supabase/migrations/20261109113800_site_reviews.sql');

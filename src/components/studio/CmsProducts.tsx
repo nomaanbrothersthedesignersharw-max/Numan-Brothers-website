@@ -14,7 +14,7 @@ interface Draft {
   price:string;offerPrice:string;customizable:boolean;sortRank:number;
 }
 type ProductRevision={id:number;version:number;published_at:string;content:unknown};
-type Entry={id:string;label:string;live:boolean;draft:boolean;form:Draft};
+type Entry={id:string;label:string;sku:string;live:boolean;draft:boolean;form:Draft};
 const blank: Draft = {
   sku:'',slug:'',title:'',department:'men',categoryPaths:[],description:'',
   fabric:'',sizes:[],imageUrls:[],videoUrl:'',price:'',offerPrice:'',customizable:false,sortRank:0,
@@ -67,7 +67,6 @@ export default function CmsProducts({client,userId,canPublish}:Props){
   const [form,setForm]=useState<Draft>({...blank});
   const [isNew,setIsNew]=useState(false);
   const [skuLoading,setSkuLoading]=useState(false);
-  const [skuEdited,setSkuEdited]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState<string|null>(null);
   const [message,setMessage]=useState<string|null>(null);
@@ -92,7 +91,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
       .order('id',{ascending:true}).range(page*50,page*50+49);
     if(error)setError(error.message);
     setRows((data||[]).map(item=>({
-      id:item.id as string,label:item.title as string,live:item.status==='published',
+      id:item.id as string,label:item.title as string,sku:item.sku as string,live:item.status==='published',
       draft:Boolean(item.has_draft),form:{...blank},
     })));
     setTotalCount(count||0);
@@ -114,7 +113,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     setRevisionsLoading(false);
   };
   const open=async(entry:Entry)=>{
-    setIsNew(false);setSkuEdited(true);setId(entry.id);setPublishedSlug(null);setError(null);setMessage(null);setBusy(true);
+    setIsNew(false);setId(entry.id);setPublishedSlug(null);setError(null);setMessage(null);setBusy(true);
     setRevisions([]);void loadRevisions(entry.id);
     const [draft,published]=await Promise.all([
       client.from('nb_product_drafts').select('content').eq('product_id',entry.id).maybeSingle(),
@@ -131,34 +130,13 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     setBusy(false);
   };
   const update=<K extends keyof Draft>(key:K,value:Draft[K])=>setForm((current)=>({...current,[key]:value}));
-  const create=()=>{setId(crypto.randomUUID());setPublishedSlug(null);setIsNew(true);setSkuEdited(false);setForm({...blank});setRevisions([]);setError(null);setMessage(null)};
-  const prepareSherwaniDraft=async()=>{
-    const path='/men/sherwani/plain';
-    const nextId=crypto.randomUUID();
-    setId(nextId);setPublishedSlug(null);setIsNew(true);setSkuEdited(false);
-    setRevisions([]);setError(null);setMessage(null);
-    setSkuLoading(true);
-    const {data,error}=await client.rpc('nb_next_sku',{p_category_path:path});
-    setSkuLoading(false);
-    if(error||!data){
-      setError('Could not prepare sample SKU: '+(error?.message||'Please try again.'));
-      setForm({...blank,categoryPaths:[path]});
-      return;
-    }
-    const sku=String(data);
-    setForm({...blank,department:'men',categoryPaths:[path],sku,
-      slug:'plain-sherwani-sample-'+sku.toLowerCase(),
-      title:'Plain Sherwani — Example Garment',
-      description:'TEST DRAFT. Replace this content with the owner-approved garment description and photographs before publishing.',
-      sizes:['38','40','42','44'],fabric:'To be confirmed with the showroom',customizable:true});
-    setMessage('Sample prepared as a private editable draft. Upload real approved photographs and check every field before publishing.');
-  };
+  const create=()=>{setId(crypto.randomUUID());setPublishedSlug(null);setIsNew(true);setForm({...blank});setRevisions([]);setError(null);setMessage(null)};
   const slugify=(value:string)=>value.normalize('NFKD').toLowerCase()
     .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,110);
   const chooseCategory=async(path:string)=>{
     if(!path)return;
     setForm(current=>({...current,categoryPaths:[path]}));
-    if(!isNew||skuEdited)return;
+    if(!isNew)return;
     setSkuLoading(true);setError(null);
     const {data,error}=await client.rpc('nb_next_sku',{p_category_path:path});
     if(error)setError('Could not generate SKU: '+error.message);
@@ -228,11 +206,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><h2 className="font-serif text-3xl">Products</h2><p className="mt-2 text-sm text-stone-600">Create and edit private drafts; approved owners publish changes atomically.</p></div>
       <div className="flex flex-wrap gap-2">
-         <a href="/products/sample-plain-sherwani" target="_blank" rel="noopener noreferrer"
-           className={outlineClass}>Review sample Plain Sherwani <ArrowRight size={15}/></a>
-         <button type="button" className={outlineClass} onClick={()=>void prepareSherwaniDraft()}>
-           Prepare editable sherwani draft</button>
-         <button type="button" className={primaryClass} onClick={create}><Plus size={16}/> New product</button>
+<button type="button" className={primaryClass} onClick={create}><Plus size={16}/> New product</button>
        </div>
     </div>
     <div className="nb-responsive-grid grid gap-3 rounded-lg border border-stone-200 bg-white p-3 min-[360px]:p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,auto)]">
@@ -256,7 +230,8 @@ export default function CmsProducts({client,userId,canPublish}:Props){
             className={'w-full rounded-md px-3 py-3 text-left '+
               (item.id===id?'bg-stone-900 text-white':'hover:bg-stone-100')}>
             <span className="block text-sm font-semibold">{item.label}</span>
-            <span className="mt-1 block text-[10px] font-semibold underline">Edit garment</span>
+             <span className="mt-1 block font-mono text-xs font-semibold">{item.sku}</span>
+             <span className="mt-1 block text-[11px] font-semibold underline">{item.live?'Edit published product':'Continue editing draft'}</span>
             <span className={'mt-1 block text-xs '+(item.id===id?'text-stone-300':'text-stone-500')}>
               {item.live?'Published':'Not published'}{item.draft?' · Draft saved':''}
             </span>
@@ -274,7 +249,8 @@ export default function CmsProducts({client,userId,canPublish}:Props){
         </div>:<div className="space-y-6">
           <button type="button" className="flex items-center gap-2 text-xs text-stone-600" onClick={()=>setId(null)}><ArrowLeft size={14}/> Back to product list</button>
           <h3 className="font-serif text-2xl">{active?.label||'New product draft'}</h3>
-          <p className="break-all text-xs text-stone-500">{id}</p>
+          <p className="text-xs text-stone-600">{publishedSlug?'This product is live. Edit any fields below, then select Update published product. Customers see only the new published version.':'Save a private draft, then publish when the product and photos are ready.'}</p>
+           <p className="break-all text-xs text-stone-500">Internal record ID: {id}</p>
           {publishedSlug&&id&&<a href={productPath({id,slug:publishedSlug})} target="_blank" rel="noopener noreferrer"
             className="inline-flex min-h-11 items-center gap-2 border border-[#bd9e72] bg-[#f6ecdd] px-4 text-sm font-semibold text-[#5a3e26] hover:bg-[#ead8bf]">
             View live garment page <ArrowRight size={16}/>
@@ -284,7 +260,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
             <div className="nb-responsive-grid grid gap-3 sm:grid-cols-2">
               {(['men','kids'] as const).map(dept=><button type="button" key={dept} aria-pressed={form.department===dept}
                 className={(form.department===dept?primaryClass:outlineClass)+' w-full'}
-                onClick={()=>{setForm({...form,department:dept,categoryPaths:[],sku:isNew?'':form.sku,slug:isNew?'':form.slug});setSkuEdited(false)}}>
+                onClick={()=>{setForm({...form,department:dept,categoryPaths:[],sku:isNew?'':form.sku,slug:isNew?'':form.slug})}}>
                 {dept==='men'?"Men’s Wear":"Kids Wear"}</button>)}
             </div>
             <label className="block text-sm font-semibold">Garment category (required)
@@ -294,7 +270,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
                 {categories.map(c=><option key={c.path} value={c.path}>{c.title}</option>)}
               </select>
             </label>
-            <p className="text-xs leading-6 text-stone-600">Choosing a garment type assigns the first collection and automatically reserves a unique SKU such as NB-KP-00001, NB-PA-00001 or NB-JP-00001. You may edit it. Publishing creates an individual page at /products/your-product-slug; existing UUID links will still work.</p>
+            <p className="text-xs leading-6 text-stone-600">Choose the department and garment type first. The database reserves a permanent unique SKU, such as NB-SH-00001, NB-SH-00002 or NB-SU-00001. SKU never changes, even when you edit a published product.</p>
           </section>
           <div className="nb-responsive-grid grid gap-5 md:grid-cols-2">
             <Field label="Garment title"><input className={inputClass} value={form.title} onChange={e=>{
@@ -305,9 +281,14 @@ export default function CmsProducts({client,userId,canPublish}:Props){
                   ?[slugify(title),cur.sku.toLowerCase()].filter(Boolean).join('-'):cur.slug};
               });
             }} maxLength={180}/></Field>
-            <Field label="Unique SKU (auto-generated, editable)"><input className={inputClass} value={form.sku}
-              onChange={e=>{setSkuEdited(true);update('sku',e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g,''))}}
-              maxLength={80} placeholder={skuLoading?'Generating…':'Choose category above'} /></Field>
+            <div><Field label="Permanent SKU · auto-generated (read-only)">
+              <input className={inputClass+' font-mono font-bold'} value={form.sku} readOnly
+                aria-label="Permanent auto-generated SKU" placeholder={skuLoading?'Generating…':'Select category above'} />
+            </Field>
+              <p className="mt-1 text-xs text-stone-500">Use this exact code on garment labels and photo batches.</p>
+              {form.sku&&<button type="button" className="mt-2 rounded border border-amber-300 px-3 py-2 text-xs"
+                onClick={()=>void navigator.clipboard.writeText(form.sku)}>Copy SKU</button>}
+            </div>
             <Field label="Product URL slug (the readable website address)"><input className={inputClass} value={form.slug}
               onChange={e=>update('slug',slugify(e.target.value))} placeholder="ivory-kurta-pyjama-nb-kp-00001"/></Field>
             <Field label="Fabric"><input className={inputClass} value={form.fabric} onChange={e=>update('fabric',e.target.value)}/></Field>
@@ -335,7 +316,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
           </fieldset>
           <div className="space-y-3">
             <h4 className="font-serif text-2xl">Step 2 · Garment photos and video</h4>
-            <p className="text-xs leading-6 text-stone-600">Drag photographs directly from your computer. Owner/admin uploads are securely approved and attached automatically. Or browse the selected Men's/Kids' media category. Use the trash icon to detach one photo without deleting it from the library.</p>
+            <p className="text-xs leading-6 text-stone-600">Drag photos here—an authorized owner upload is approved and attached automatically. For bulk imports, use the exact SKU, e.g. {form.sku||'NB-SH-00001'}_01.jpg. The trash icon only detaches a photo; it does not delete the library copy.</p>
             <AssetEditor client={client} userId={userId} canPublish={canPublish} label="Product photos · first is the cover" multiple department={form.department} categoryPath={form.categoryPaths[0]||''}
               selected={form.imageUrls} onChange={urls=>update('imageUrls',urls)}/>
             <AssetEditor client={client} userId={userId} canPublish={canPublish} label="Optional garment video"
@@ -358,7 +339,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
           </section>
           <div className="flex flex-wrap gap-3 border-t border-stone-200 pt-6">
             <button type="button" className={outlineClass} disabled={busy} onClick={()=>void save()}><Save size={15}/> Save private draft</button>
-            {canPublish&&<button type="button" className={primaryClass} disabled={busy} onClick={()=>void publish()}><Send size={15}/> Publish approved version</button>}
+            {canPublish&&<button type="button" className={primaryClass} disabled={busy||skuLoading} onClick={()=>void publish()}><Send size={15}/> {publishedSlug?'Update published product':'Publish product'}</button>}
             <button type="button" className={outlineClass} disabled={busy} onClick={()=>void discardDraft()}><Trash2 size={15}/> Discard private draft</button>
             {canPublish&&active?.live&&<button type="button" className={outlineClass+' border-amber-400 text-amber-900'} disabled={busy} onClick={()=>void archiveProduct()}><Archive size={15}/> Archive garment</button>}
           </div>

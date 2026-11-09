@@ -32,12 +32,13 @@ export default {
       }catch{return new Response('Demo temporarily unavailable',{status:503});}
     }
     const isUuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle);
+    const isSku=/^NB-[A-Z]{2,3}-[0-9]{5}$/.test(handle);
     const headers={
       'Content-Type':'text/html; charset=utf-8',
       'X-Content-Type-Options':'nosniff',
       'Cache-Control':'public, s-maxage=90, stale-while-revalidate=600',
     };
-    if(handle.length>120 || !(isUuid||/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(handle)))
+    if(handle.length>120 || !(isUuid||isSku||/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(handle)))
       return new Response('Invalid product',{status:404,headers});
     const api=process.env.VITE_SUPABASE_URL||'';
     const key=process.env.VITE_SUPABASE_PUBLISHABLE_KEY||'';
@@ -48,7 +49,7 @@ export default {
     catch{return new Response('Build template unavailable',{status:503,headers:{...headers,'Cache-Control':'no-store'}})}
     try{
       const url=new URL(api+'/rest/v1/nb_products');
-      url.searchParams.set(isUuid?'id':'slug','eq.'+handle);
+      url.searchParams.set(isUuid?'id':isSku?'sku':'slug','eq.'+handle);
       url.searchParams.set('status','eq.published');
       url.searchParams.set('select','id,slug,sku,title,department,description,fabric,image_urls,price,offer_price,status');
       url.searchParams.set('limit','1');

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { checkMediaFile, uploadCmsFile } from './cmsUpload';
-import { type CsvRow, downloadCsvErrors, skuFromImageFilename, validateCatalogueCsv, MAX_CSV_BYTES } from './bulkCsv';
+import { type CsvRow, assignImportedSku, downloadCsvErrors, skuFromImageFilename, validateCatalogueCsv, MAX_CSV_BYTES } from './bulkCsv';
 
 type JobKind='csv'|'images';
 type ItemStatus='imported'|'skipped'|'failed'|'pending';
@@ -93,8 +93,41 @@ export async function importCatalogueFile(
   for(let i=0;i<rows.length;i+=50){
     const batch=rows.slice(i,i+50);
     const previous=await existingRows(client,job.id,batch.map(x=>x.rowNumber));
-    const todo=batch.filter(row=>!['imported','skipped'].includes(previous.get(row.rowNumber)?.status||''));
-    if(!todo.length){progress(snapshot(job.id,rows.length,counters,failures));continue;}
+    const outstanding=batch.filter(row=>!['imported','skipped'].includes(previous.get(row.rowNumber)?.status||''));
+    if(!outstanding.length){progress(snapshot(job.id,rows.length,counters,failures));continue;}
+
+    // Reserve all blank-SKU rows in bounded server-side batches. Persist each
+    // reservation first so a network failure or page refresh never changes
+    // its identity on retry. Counter gaps are okay; duplicate SKUs are not.
+    const reserved=new Map<number,string>();
+    const toReserve=new Map<string,CsvRow[]>();
+    for(const row of outstanding){
+      if(row.error||row.sku)continue;
+      const prior=previous.get(row.rowNumber)?.sku;
+      if(prior && /^NB-[A-Z]{2,3}-[0-9]{5}$/.test(prior)){
+        reserved.set(row.rowNumber,prior);
+      }else{
+        toReserve.set(row.categoryPath,[...(toReserve.get(row.categoryPath)||[]),row]);
+      }
+    }
+    for(const [categoryPath,waiting] of toReserve){
+      const {data,error}=await client.rpc('nb_reserve_skus',{
+        p_category_path:categoryPath,p_count:waiting.length,
+      });
+      if(error||!Array.isArray(data)||data.length!==waiting.length)
+        throw new Error('Unable to reserve unique product SKUs: '+(error?.message||'Unexpected response'));
+      const reservations=waiting.map((row,index)=>{
+        const sku=String(data[index]);
+        reserved.set(row.rowNumber,sku);
+        return {job_id:job.id,row_number:row.rowNumber,sku,
+          status:'pending',message:'SKU reserved; product draft not yet imported'};
+      });
+      const {error:saveError}=await client.from('nb_import_rows')
+        .upsert(reservations,{onConflict:'job_id,row_number'});
+      if(saveError)throw new Error('Could not save reserved SKUs: '+saveError.message);
+    }
+    const todo=outstanding.map(row=>row.sku?row:
+      row.error?row:assignImportedSku(row,reserved.get(row.rowNumber)||''));
     const valid=todo.filter(row=>!row.error);
     const found=new Set<string>();
     if(valid.length){
@@ -151,12 +184,13 @@ export async function importCatalogueFile(
 export async function importImageFiles(
   client:SupabaseClient,userId:string,files:File[],
   progress:(status:ImportStatus,currentFilename:string,percent:number)=>void,
+  options?:{department:'men'|'kids';categoryPath:string},
 ):Promise<ImportStatus>{
   if(!files.length||files.length>250)throw new Error('Choose 1–250 photos in a batch');
   // Hash the actual file bytes (one file at a time) for deterministic retries.
   const fingerprints:string[]=[];
   for(const file of files)fingerprints.push(file.name+':'+await sha256(await file.arrayBuffer()));
-  const key=await sha256(new TextEncoder().encode('images\n'+fingerprints.join('\n')));
+  const key=await sha256(new TextEncoder().encode('images\n'+(options?.categoryPath||'')+'\n'+fingerprints.join('\n')));
   const job=await getJob(client,userId,key,'images',files.length+' product photos',files.length);
   const counters=await getCounters(client,job.id);
   const failures:ImportStatus['failures']=[];
@@ -176,7 +210,7 @@ export async function importImageFiles(
         const deterministicId=await stableImportId(job.id,index);
         const asset=await uploadCmsFile(client,file,userId,percent=>
           progress(snapshot(job.id,files.length,counters,failures),file.name,percent),
-          {stableObjectId:deterministicId});
+          {stableObjectId:deterministicId,department:options?.department,categoryPath:options?.categoryPath});
         mediaId=asset.id;
       }catch(error){status='failed';message=error instanceof Error?error.message:'Upload failed';}
     }

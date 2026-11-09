@@ -1,6 +1,6 @@
 # Nomaan Brothers — Production storefront and CMS
 
-A mobile-first, browse-and-enquire catalogue for the traditional menswear and kidswear showroom in Mandi Bazar, Warangal. Built by Alif Growth Media. **The source of truth is the `main` branch. The SQL installer includes 15 ordered migrations plus live-client existing-table reconciliation.**
+A mobile-first, browse-and-enquire catalogue for the traditional menswear and kidswear showroom in Mandi Bazar, Warangal. Built by Alif Growth Media. **The source of truth is the `main` branch. The SQL installer includes 16 ordered migrations plus live-client existing-table reconciliation.**
 
 ## Live services
 
@@ -18,7 +18,7 @@ A mobile-first, browse-and-enquire catalogue for the traditional menswear and ki
 - Footer and contact pages display a single **locally bundled Instagram icon**. Only an owner-supplied valid HTTPS Instagram profile published in Studio activates the link; otherwise the icon stays disabled.
 - Public legal-policy pages edited through Studio; empty policies clearly indicate pending owner approval.
 - First-party customer reviews held pending until an authorized staff member moderates them.
-- CMS for product drafts, category selection, generated SKUs, media approvals, bulk import, homepage sections, policy text, social URLs and revisions.
+- CMS for editable published garments, permanent server-generated SKU identities, Men/Kids category media, photo auto-labeling, bulk CSV import with optional SKU, owner approval, homepage text, social URL and revision history.
 - Read-only storefront access to published records; restricted Supabase row-level and Storage policies.
 - GitHub Actions typecheck, tests, PostgreSQL permission checks, production build and 18-breakpoint Chromium smoke checks, including live deployments.
 
@@ -49,7 +49,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY
 1. In Supabase Auth, provision a verified staff email and assign a server-controlled `app_metadata.nb_role` of `owner`, `admin` or `editor` as appropriate; user metadata does not grant publisher access.
 2. Open **Studio → Website CMS**. Upload and approve media via the Media workflow, select imagery and a compressed brand film, and edit text, profiles or policies.
 3. For Instagram, enter the shop owner’s official HTTPS profile in Studio → Website CMS → Footer. Host validation rejects unrelated destinations. **Save draft → Publish website changes**.
-4. Products require the correct Men’s/Kids’ category and generated SKU. Publish only approved photos and verified descriptions; confirm mobile UI and WhatsApp sharing from the product page.
+4. Products: choose Men’s/Kids’ category first to reserve NB-SH-00001-style permanent SKU, attach approved photographs, save private draft and publish. Search any live product by SKU, edit details/photos and select **Update published product**. Bulk CSV may leave SKU blank; export generated SKU mapping, assign camera photo batches to a single SKU, approve and match images before publishing.
 5. Review incoming customer feedback under **Customer Reviews**. Public submissions stay pending; approve genuine reviews only.
 6. Review both Vercel deployments and the GitHub Actions quality gate before changing production traffic.
 
@@ -63,7 +63,9 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY
 
 - [Production operations and commissioning](docs/OPERATIONS.md)
 - [Studio user guide](docs/CMS_USER_GUIDE.md)
-- [Client deployment](docs/CLIENT_ONBOARDING.md)
+- [Standalone client handoff, single production Supabase and one owner login](docs/CLIENT_ONBOARDING.md)
+- [One-paste new-project SQL (16 migrations)](supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql)
+- [One-time owner role SQL after creating Auth user](supabase/sql-editor/NOMAN_BROTHERS_ASSIGN_OWNER_AFTER_AUTH.sql)
 - [SQL Editor installation and migrations](docs/NOMAN_SQL_EDITOR_COPY_PASTE.md)
 - [Cinematic intro and video upload](docs/2026-11-09-cinematic-hero-production.md)
 - [Social logos and license attribution](docs/SOCIAL_ICON_LICENSES.md)

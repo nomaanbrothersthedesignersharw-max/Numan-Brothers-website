@@ -53,15 +53,16 @@ export async function loadCataloguePage(
   };
 }
 const isUuid=(handle:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle);
+const isSku=(handle:string)=>/^NB-[A-Z]{2,3}-[0-9]{5}$/.test(handle);
 export const isValidProductHandle=(handle:string):boolean =>
-  handle.length<=120 && (isUuid(handle)||/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(handle));
+  handle.length<=120 && (isUuid(handle)||isSku(handle)||/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(handle));
 
 /** Publish-only lookup: readable slugs and existing UUID shares both resolve. */
 export async function loadProductById(handle:string):Promise<CatalogProduct|null> {
   if(!isValidProductHandle(handle))return null;
   const client=getCmsClient();if(!client)return null;
   const {data,error}=await client.from('nb_products').select(columns)
-    .eq('status','published').eq(isUuid(handle)?'id':'slug',handle).maybeSingle();
+    .eq('status','published').eq(isUuid(handle)?'id':isSku(handle)?'sku':'slug',handle).maybeSingle();
   if(error||!data)return null;
   return rowToProduct(data as CmsProductRow);
 }

@@ -49,7 +49,7 @@ export function validateCatalogueCsv(csv:string):CsvRow[]{
   const rows=parseCsv(csv);
   if(!rows.length)throw new Error('CSV contains no header');
   const fields=rows[0].map(x=>x.trim().toLowerCase());
-  for(const required of ['sku','title','department','category']){
+  for(const required of ['title','department','category']){
     if(!fields.includes(required))throw new Error('Missing CSV column: '+required);
   }
   if(new Set(fields).size!==fields.length)throw new Error('Duplicate header names');
@@ -64,18 +64,18 @@ export function validateCatalogueCsv(csv:string):CsvRow[]{
     const sizes=String(source.sizes||'').split('|').map(x=>x.trim()).filter(Boolean).slice(0,40);
     const price=String(source.price||'');
     let error:string|null=null;
-    if(!/^[A-Z0-9][A-Z0-9_-]{1,79}$/.test(sku))error='SKU must be 2–80 letters, digits, underscore or hyphen';
-    else if(seen.has(sku))error='Duplicate SKU in CSV';
+    if(sku && !/^[A-Z0-9][A-Z0-9_-]{1,79}$/.test(sku))error='SKU must be 2–80 letters, digits, underscore or hyphen';
+    else if(sku && seen.has(sku))error='Duplicate SKU in CSV';
     else if(title.length<2||title.length>180)error='Title must be 2–180 characters';
     else if(source.department!=='men'&&source.department!=='kids')error='Department must be men or kids';
     else if(categoryPaths.get(category)!==dep)error='Invalid category or category department mismatch';
     else if(price && (!/^\d{1,10}(?:\.\d{1,2})?$/.test(price)||Number(price)<0))
       error='Invalid optional price';
     else if(columns.length>fields.length)error='Extra CSV columns found';
-    seen.add(sku);
+    if(sku)seen.add(sku);
     const slugBase=title.toLowerCase().normalize('NFKD')
       .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,90)||'garment';
-    const slug=slugBase+'-'+sku.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    const slug=sku ? slugBase+'-'+sku.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') : slugBase;
     const draft:CsvRow['draft']={
       sku,slug,title,department:dep,categoryPaths:category?[category]:[],
       description:String(source.description||'').slice(0,2000),fabric:String(source.fabric||'').slice(0,250),
@@ -98,4 +98,40 @@ export function downloadCsvErrors(rows:{rowNumber:number;sku:string;message:stri
     return '"'+safe.replace(/"/g,'""')+'"';
   };
   return ['row,sku,error',...rows.map(x=>[x.rowNumber,x.sku,x.message].map(esc).join(','))].join('\r\n');
+}
+
+// A SKU is optional in product CSV. The authenticated import job reserves one
+// from the server for each row and persists it in nb_import_rows before writing
+// the draft so interrupted imports can safely resume with the same identity.
+export function assignImportedSku(row:CsvRow,sku:string):CsvRow {
+  const code=sku.trim().toUpperCase();
+  if(!/^[A-Z0-9][A-Z0-9_-]{1,79}$/.test(code))
+    throw new Error('The database returned an invalid garment SKU');
+  const suffix=code.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+  return {...row,sku:code,draft:{...row.draft,sku:code,slug:row.draft.slug+'-'+suffix}};
+}
+
+/**
+ * The owner can select ordinary camera photos and assign a single product SKU
+ * to the batch. The resulting names follow SKU_01.jpg, SKU_02.jpg, so they can
+ * be matched automatically after approval, without guessing image contents.
+ * Pre-named multi-product batches remain supported when no SKU is specified.
+ */
+export function prepareSkuPhotoBatch(files:File[],rawSku:string):File[] {
+  const sku=rawSku.trim().toUpperCase();
+  if(!sku)return files;
+  if(!/^NB-[A-Z]{2,3}-[0-9]{5}$/.test(sku))
+    throw new Error('Enter a generated SKU such as NB-SH-00001, or leave blank for pre-named batches.');
+  if(files.length>250)throw new Error('Choose no more than 250 photos');
+  const byMime:Record<string,string>={
+    'image/jpeg':'jpg','image/png':'png','image/webp':'webp',
+    'image/avif':'avif','image/gif':'gif',
+  };
+  return files.map((file,index)=>{
+    const ext=byMime[file.type];
+    if(!ext)throw new Error('Only JPG, PNG, WebP, AVIF or GIF photos can be imported');
+    return new File([file],sku+'_'+String(index+1).padStart(2,'0')+'.'+ext,{
+      type:file.type,lastModified:file.lastModified,
+    });
+  });
 }

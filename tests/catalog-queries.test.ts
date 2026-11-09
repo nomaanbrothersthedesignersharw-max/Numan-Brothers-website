@@ -28,6 +28,8 @@ describe('Unique public product URLs',()=>{
   test('rejects malformed handles while accepting UUID',()=>{
     expect(isValidProductHandle('ivory-sherwani-nb-sh-00001')).toBe(true);
     expect(isValidProductHandle('11111111-1111-4111-8111-111111111111')).toBe(true);
+    expect(isValidProductHandle('NB-SH-00001')).toBe(true);
+    expect(isValidProductHandle('NB-SU-00002')).toBe(true);
     for(const bad of ['','%2F','../../../etc/passwd','Sneaky,or.eq','a'.repeat(121)])
       expect(isValidProductHandle(bad)).toBe(false);
   });

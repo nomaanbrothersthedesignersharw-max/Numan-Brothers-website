@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { parseCsv, skuFromImageFilename, validateCatalogueCsv, downloadCsvErrors } from '../src/lib/bulkCsv';
+import { parseCsv, skuFromImageFilename, validateCatalogueCsv, downloadCsvErrors, assignImportedSku, prepareSkuPhotoBatch } from '../src/lib/bulkCsv';
 
 describe('Catalogue onboarding CSV parser',()=>{
   test('accepts quoted commas, escaped quotes and CRLF',()=>{
@@ -23,10 +23,25 @@ describe('Catalogue onboarding CSV parser',()=>{
     expect(data[2].error).toContain('category');
   });
   test('requires headers and guards SQL/postgrest unsafe title data',()=>{
-    expect(()=>validateCatalogueCsv('id,title\n1,Hi')).toThrow('Missing CSV column: sku');
+    expect(()=>validateCatalogueCsv('id,title\n1,Hi')).toThrow('Missing CSV column: department');
     const rows=validateCatalogueCsv('sku,title,department,category\nNB-01,=HYPERLINK,men,/men/suits\n');
     expect(rows[0].draft.title).toBe('=HYPERLINK');
     // CMS renders React text (not HTML) and does not interpolate SQL strings.
+  });
+  test('reserves database SKUs for CSV rows without manually assigned codes',()=>{
+    const rows=validateCatalogueCsv('title,department,category\nIvory Sherwani,men,/men/sherwani/plain\nRoyal Suit,men,/men/suits/handwork\n');
+    expect(rows.every(r=>r.error===null&&r.sku==='')).toBe(true);
+    const assigned=assignImportedSku(rows[0],'NB-SH-00001');
+    expect(assigned.draft.sku).toBe('NB-SH-00001');
+    expect(assigned.draft.slug).toBe('ivory-sherwani-nb-sh-00001');
+  });
+  test('renames ordinary phone photographs for one product without changing image bytes',()=>{
+    const files=[new File(['one'],'IMG_1001.jpg',{type:'image/jpeg'}),new File(['two'],'IMG_1002.png',{type:'image/png'})];
+    const named=prepareSkuPhotoBatch(files,'nb-sh-00001');
+    expect(named.map(f=>f.name)).toEqual(['NB-SH-00001_01.jpg','NB-SH-00001_02.png']);
+    expect(named[0].type).toBe('image/jpeg');
+    expect(prepareSkuPhotoBatch(files,'')).toEqual(files);
+    expect(()=>prepareSkuPhotoBatch(files,'bad')).toThrow('generated SKU');
   });
   test('matches deterministic photo order and rejects unsafe extensions',()=>{
     expect(skuFromImageFilename('NB-SHW-001_02.webp')).toEqual({sku:'NB-SHW-001',order:2});

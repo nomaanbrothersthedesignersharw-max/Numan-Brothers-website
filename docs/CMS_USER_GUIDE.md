@@ -12,16 +12,16 @@
 ## Add a product (few products at a time)
 
 1. Open **Products > New product**.
-2. Enter unique SKU (e.g. `NB-SHW-001`), garment name, URL slug, department, relevant category, sizes, fabric, description and optional price. Sizes describe offerings; no stock counts are tracked.
-3. Upload original, authorized garment images in the **Media library**. Pending photographs are private and cannot appear on the public catalogue. The owner/admin reviews and approves them.
-4. Reopen the product, search the **approved images** by filename/SKU, choose cover and gallery order (first image is cover), and optionally add an approved video.
+2. Select **Men’s/Kids’ Wear**, then a garment category before anything else. Supabase reserves the permanent read-only SKU (e.g. `NB-SH-00001` for Sherwani or `NB-SU-00001` for Suits). Then enter name, fabric, sizes, description and optional price. The UUID primary key remains unique too; no stock counts are tracked.
+3. Simplest: drag authorized photos directly into the product. Owner/admin uploads are approved by the protected Edge Function and attached automatically. Alternatively upload into the Media library; pending files stay private until reviewed.
+4. Choose cover and gallery order (first image is cover), optionally select an approved video. Use **Choose/replace** for previously uploaded library files.
 5. Click **Save private draft**. Verify the public site remains unchanged.
-6. Owner/admin reviews draft details and photographs, then clicks **Publish approved version**. Verify it appears in the correct collection and the customer sees only approved content.
+6. Owner/admin publishes the first version. For a published garment, search by name or SKU, click **Edit published product**, change price/text/photos/category, then **Update published product**. Its SKU stays unchanged; old published versions stay in revision history. Archive removes an item from the public site without deleting its history.
 
 ## Bulk catalogue CSV
 
 - Go to **Bulk imports** and choose a CSV up to 8 MB with at most 10,000 rows. Start with the file `templates/products.csv`.
-- Required columns: `sku,title,department,category`; optional: `sizes,fabric,description,price`.
+- Required columns: `title,department,category`; optional: `sku,sizes,fabric,description,price`. Leave SKU blank for automatic serial allocation and download the resulting SKU mapping CSV.
 - Department must be `men` or `kids`; category must be a valid full category path such as `/men/sherwani`. Sizes are separated by `|` (e.g. `38|40|42`).
 - Review the **valid/invalid** count before import. Existing SKUs are skipped, not overwritten. Rows are stored as private drafts; there is **no automatic mass publication**.
 - If interrupted, run the same file again. The import fingerprint resumes previously recorded rows. Avoid running the same import concurrently from two staff sessions.
@@ -29,7 +29,7 @@
 
 ## Bulk photographs and SKU matching
 
-1. Rename photographs by SKU and intended gallery order: `NB-SHW-001_01.jpg`, `NB-SHW-001_02.jpg`, etc.
+1. Choose Men’s/Kids’ and required category for each photo batch. If the files belong to **one** product, paste its SKU, e.g. `NB-SH-00001`, and the app renames camera pictures automatically to `NB-SH-00001_01.jpg`, `NB-SH-00001_02.jpg`. For mixed-product batches, pre-rename files as SKU_01.jpg before upload.
 2. Select at most **250 images per batch** in Bulk imports. Accepted images: JPEG, PNG, WebP, AVIF, GIF. 50 MB maximum per file; use smaller optimized files for real customer performance.
 3. Files upload to private staging first. Owner/admin reviews and approves in Media library.
 4. Open **Bulk imports > Match approved images by SKU** to attach approved photos to product drafts that currently have **empty galleries**. Manual galleries are preserved. Matching processes bounded batches and may require another click to finish.
