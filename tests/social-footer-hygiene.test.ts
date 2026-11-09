@@ -55,14 +55,13 @@ describe('Instagram-only footer release contracts',()=>{
     expect(studio).toContain('Instagram profile URL');
     expect(studio).not.toContain('All nine branded icons');
   });
-  test('branch cleanup occurs only after successful main checks and unchanged merged PR head',()=>{
+  test('remote branch cleanup stays manual and repository CI is read-only',()=>{
     const workflow=src('.github/workflows/quality.yml');
-    expect(workflow).toContain('cleanup-merged-working-branches:');
-    expect(workflow).toContain('needs: [typecheck-and-build, browser-ui-smoke]');
-    expect(workflow).toContain("github.ref == 'refs/heads/main'");
-    expect(workflow).toContain("pr.get('merged_at')");
-    expect(workflow).toContain("pr.get('head',{}).get('sha')==branch['commit']['sha']");
-    expect(workflow).toContain("if name=='main':continue");
-    expect(workflow).toContain('contents: write');
+    expect(workflow).not.toContain('cleanup-merged-working-branches:');
+    expect(workflow).not.toContain('contents: write');
+    expect(workflow).toContain('contents: read');
+    const readme=src('README.md');
+    expect(readme).toContain('Delete merged working branches manually');
+    expect(readme).toContain('CI does not automatically delete remote branches');
   });
 });
