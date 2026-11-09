@@ -35,6 +35,14 @@ describe('multi-video product gallery contract',()=>{
     expect(sql).toContain("draft->'videoUrls'");
   });
 
+  test('indexes published and draft video references for fast lifecycle checks',()=>{
+    const sql=source('supabase/migrations/20261109233000_video_gallery_lookup_indexes.sql');
+    expect(sql).toContain('nb_products_video_urls_gin_idx');
+    expect(sql).toContain('USING gin (video_urls)');
+    expect(sql).toContain('nb_product_drafts_content_gin_idx');
+    expect(sql).toContain('jsonb_path_ops');
+  });
+
   test('video gallery player mounts one selected video and keeps metadata bounded',()=>{
     const view=source('src/components/V2Product.tsx');
     expect(view).toContain('productVideos.length');
