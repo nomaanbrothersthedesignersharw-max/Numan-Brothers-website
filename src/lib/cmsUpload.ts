@@ -137,7 +137,6 @@ export async function uploadCmsFile(
 
   if(!alreadyStored){
     options?.onPreparing?.();
-    options?.onPreparing?.();
     prepared=await prepareMediaFile(file);
     uploadFile=prepared.file;
     const validation=checkMediaFile(uploadFile);
