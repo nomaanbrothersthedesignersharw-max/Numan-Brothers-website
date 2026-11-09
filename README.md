@@ -56,7 +56,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY
 
 ## Branch policy
 
-`main` is the only persistent branch. For substantial changes, open a short-lived pull request branch and merge after quality checks. A post-success GitHub Actions maintenance job checks each temporary `agm/` branch against its **exact unchanged merged PR head** and deletes it; unmerged, protected, or modified work is preserved. No extra Netlify builds or previews are created.
+`main` is the release branch. For substantial changes, open a short-lived pull request branch and merge only after all required quality checks pass. Delete merged working branches manually after verifying the exact merged PR; CI does not automatically delete remote branches.
 
 **Admin follow-up:** Configure GitHub branch protection/rulesets for `main` (required quality checks, prevent force pushes and restrict bypass). The connected GitHub integration cannot currently read or change branch protection settings, so this must be verified in GitHub repository settings.
 
