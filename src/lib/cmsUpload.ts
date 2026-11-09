@@ -83,7 +83,6 @@ type UploadOptions = {
   department?:'men'|'kids'|null;
   categoryPath?:string|null;
   onPreparing?:()=>void;
-  onPreparing?:()=>void;
   onPrepared?:(result:MediaPreparation)=>void;
 };
 function isMatchingExisting(existing:CmsMediaRow,file:File):boolean {
