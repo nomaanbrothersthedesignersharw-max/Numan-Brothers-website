@@ -198,7 +198,14 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     setDirty(true);setSaveState('idle');
     setForm(current=>({...current,[key]:value}));
   };
-  const create=()=>{
+  const create=async()=>{
+    const currentId=latestIdRef.current;
+    if(currentId){
+      setBusy(true);
+      const flushed=await persistDraft(currentId,latestFormRef.current);
+      setBusy(false);
+      if(!flushed)return;
+    }
     const productId=crypto.randomUUID();
     const fresh={...blank};
     setId(productId);setPublishedSlug(null);setIsNew(true);setForm(fresh);
@@ -207,6 +214,17 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     void persistDraft(productId,fresh).then(saved=>{
       if(saved&&latestIdRef.current===productId)setSaveState('saved');
     });
+  };
+  const backToList=async()=>{
+    const currentId=latestIdRef.current;
+    if(currentId){
+      setBusy(true);
+      const flushed=await persistDraft(currentId,latestFormRef.current);
+      setBusy(false);
+      if(!flushed)return;
+    }
+    setId(null);setPublishedSlug(null);setIsNew(false);setForm({...blank});
+    setDirty(false);setSaveState('idle');setError(null);
   };
   const slugify=(value:string)=>value.normalize('NFKD').toLowerCase()
     .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,110);
@@ -282,7 +300,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><h2 className="font-serif text-3xl">Products</h2><p className="mt-2 text-sm text-stone-600">Create and edit private drafts; approved owners publish changes atomically.</p></div>
       <div className="flex flex-wrap gap-2">
-<button type="button" className={primaryClass} onClick={create}><Plus size={16}/> New product</button>
+<button type="button" className={primaryClass} onClick={()=>void create()} disabled={busy}><Plus size={16}/> New product</button>
        </div>
     </div>
     <div className="nb-responsive-grid grid gap-3 rounded-lg border border-stone-200 bg-white p-3 min-[360px]:p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,auto)]">
@@ -323,7 +341,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
           <p className="font-serif text-3xl">Select a product</p>
           <p className="text-sm text-stone-600">Or click “New product” to start a draft.</p>
         </div>:<div className="space-y-6">
-          <button type="button" className="flex items-center gap-2 text-xs text-stone-600" onClick={()=>setId(null)}><ArrowLeft size={14}/> Back to product list</button>
+          <button type="button" className="flex items-center gap-2 text-xs text-stone-600" onClick={()=>void backToList()} disabled={busy}><ArrowLeft size={14}/> Back to product list</button>
           <h3 className="font-serif text-2xl">{active?.label||'New product draft'}</h3>
           <p className="text-xs text-stone-600">{publishedSlug?'This product is live. Edit any fields below, then select Update published product. Customers see only the new published version.':'Save a private draft, then publish when the product and photos are ready.'}</p>
            <p className="break-all text-xs text-stone-500">Internal record ID: {id}</p>
