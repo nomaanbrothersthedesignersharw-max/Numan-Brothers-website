@@ -56,19 +56,35 @@ begin
   if jsonb_typeof(coalesce(draft->'videoUrls','[]'::jsonb)) <> 'array' then
     raise exception 'Video gallery must be an array';
   end if;
-  select coalesce(array_agg(distinct url), '{}') into product_videos
+  select coalesce(array_agg(url order by ordinal), '{}') into product_videos
     from (
-      select trim(value) as url
-      from jsonb_array_elements_text(coalesce(draft->'videoUrls','[]'::jsonb))
-      union all
-      select product_video where product_video is not null
-    ) as videos
-    where url is not null and url <> '';
+      select distinct on (url) url, ordinal
+      from (
+        select trim(value) as url, ordinal::integer as ordinal
+        from jsonb_array_elements_text(coalesce(draft->'videoUrls','[]'::jsonb))
+          with ordinality as entries(value,ordinal)
+        union all
+        select product_video, 0 where product_video is not null
+      ) as candidates
+      where url is not null and url <> ''
+      order by url,ordinal
+    ) as videos;
   if cardinality(product_videos) > 200 then
     raise exception 'A product can contain at most 200 video links';
   end if;
   if exists(select 1 from unnest(product_videos) as item(url) where url !~ '^https://') then
     raise exception 'Every product video must use HTTPS';
+  end if;
+  if exists (
+    select 1 from unnest(product_videos) as item(url)
+    where position('/storage/v1/object/public/nb-media-public/' in url)>0
+      and not exists (
+        select 1 from public.nb_media m
+        where m.approved and m.mime_type like 'video/%'
+          and url=public.nb_media_public_url(m.storage_path)
+      )
+  ) then
+    raise exception 'Product videos must be approved video assets from this Media library';
   end if;
   product_video := coalesce(product_video, product_videos[1]);
   if length(product_title) < 2 or length(product_title) > 180
