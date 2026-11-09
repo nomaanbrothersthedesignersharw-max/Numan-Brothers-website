@@ -6,16 +6,21 @@ describe('upload preparation UX contract',()=>{
   test('shows image optimization before upload and bounds simultaneous image decodes',()=>{
     const upload=readFileSync(new URL('../src/lib/cmsUpload.ts',import.meta.url),'utf8');
     const media=readFileSync(new URL('../src/components/studio/CmsMedia.tsx',import.meta.url),'utf8');
+    const assetEditor=readFileSync(new URL('../src/components/studio/AssetEditor.tsx',import.meta.url),'utf8');
+    const tus=readFileSync(new URL('../src/lib/cmsUpload.ts',import.meta.url),'utf8');
     expect(upload).toContain('options?.onPreparing?.()');
     expect(upload.split('options?.onPreparing?.()').length-1).toBe(1);
     expect(media).toContain("status:'preparing'");
     expect(media).toContain('runWithConcurrency(files,2');
-    expect(media).toContain('Optimizing image…');
+    expect(media).toContain('Preparing media…');
+    expect(assetEditor).toContain('multiple?2:1');
+    expect(assetEditor).toContain('Preparing media…');
+    expect(tus).toContain('retryDelays=[0,1000,3000,7000]');
   });
 });
 
 describe('browser media preparation safety',()=>{
-  test('preserves GIF, WebP and videos without flattening animation or transcoding video',async()=>{
+  test('preserves GIF animation and video bytes; only recompresses images when the result is smaller',async()=>{
     for(const [name,type] of [
       ['animated.gif','image/gif'],
       ['animated.webp','image/webp'],
