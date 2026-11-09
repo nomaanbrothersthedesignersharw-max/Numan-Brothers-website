@@ -64,7 +64,7 @@ jobs:
           fi
       - name: Client onboarding preflight contract tests
         run: node --test tests/client-preflight.test.mjs
-      - name: Verify complete SQL Editor installer matches all nineteen source migrations
+      - name: Verify complete SQL Editor installer matches all twenty-one source migrations
         run: node --test tests/sql-editor-bundle.test.mjs
       - name: PostgreSQL CMS role and publishing test
         env:
