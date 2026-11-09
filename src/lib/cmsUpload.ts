@@ -53,6 +53,7 @@ async function resumableUpload(
 
   let offset=0;
   let failures=0;
+  const retryDelays=[0,1000,3000,7000];
   while(offset<file.size){
     try{
       const end=Math.min(offset+TUS_CHUNK_SIZE,file.size);
@@ -67,7 +68,9 @@ async function resumableUpload(
       if(!Number.isFinite(next)||next<=offset||next>file.size)throw new Error('Invalid upload offset returned from the storage server.');
       offset=next;failures=0;progress(Math.round(100*offset/file.size));
     }catch(cause){
-      if(++failures>=4)throw cause;
+      if(failures>=retryDelays.length)throw cause;
+      const delay=retryDelays[failures++];
+      if(delay)await new Promise(resolve=>setTimeout(resolve,delay));
       const check=await fetch(uploadUrl,{method:'HEAD',headers:{...authHeaders,'Tus-Resumable':'1.0.0'}});
       if(!check.ok)throw new Error('Cannot resume interrupted upload.');
       const recovered=Number(check.headers.get('Upload-Offset'));
