@@ -95,14 +95,12 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
         return asset;
       });
       const failed:File[]=[];
-      const details:string[]=[];
       let succeeded=0;
       results.forEach((result,index)=>{
         if(result.ok)succeeded++;
         else{
           failed.push(files[index]);
           const message=result.error instanceof Error?result.error.message:'Upload failed.';
-          details.push(files[index].name+': '+message);
           setFileStatuses(current=>current.map((item,i)=>i===index
             ?{...item,status:'failed',error:message}:item));
         }
@@ -115,7 +113,6 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
       }else{
         setProgress(100);
         setError(null);
-        setMessage('');
         setFileStatuses([]);
       }
     }catch(cause){
@@ -199,7 +196,7 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
       </div>
       <input aria-label="Choose photos or videos" type="file" multiple
         accept="image/jpeg,image/png,image/webp,image/avif,image/gif,video/mp4,video/webm"
-        className={inputClass} onChange={(e)=>setSelection(Array.from(e.currentTarget.files||[]))}/>
+        className={inputClass} onChange={(e)=>{setSelection(Array.from(e.currentTarget.files||[]));setFileStatuses([]);setCompressionSaved(0);}}/>
       <p className="text-xs text-stone-500">Choose up to 100 files, 50 MB maximum each. Large files use resumable uploads; total capacity depends on the Supabase plan.</p>
       {selection.length?<p role="status" className="text-xs font-semibold text-stone-700">{selection.length} file(s) selected</p>:null}
       {compressionSaved>0&&<p className="text-xs text-emerald-800">Browser compression saved {(compressionSaved/1024/1024).toFixed(2)} MB before upload.</p>}
@@ -215,7 +212,7 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
           {file.error&&<p className="text-[11px] text-red-700">{file.error}</p>}
         </li>)}
       </ul>}
-      <button type="button" className={primaryClass} onClick={()=>void upload()} disabled={!selection?.length || uploading}>
+      <button type="button" className={primaryClass} onClick={()=>void upload()} disabled={!selection.length || uploading}>
         <Upload size={16}/>{uploading ? 'Uploading batch ' + progress + '%' : fileStatuses.some(x=>x.status==='failed') ? 'Retry ' + selection.length + ' failed file(s)' : 'Upload selected files'}
       </button>
       {uploading && <progress aria-label="Overall upload progress" max={100} value={progress} className="block w-full"/>}
