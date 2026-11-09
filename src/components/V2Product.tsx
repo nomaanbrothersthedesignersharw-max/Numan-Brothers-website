@@ -24,6 +24,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   const theme = productTheme(garment);
   const images = (product.images || []).filter(image => /^https:\/\//i.test(image) || (garment.slug==='sample-plain-sherwani' && /^\/editorial\/(sherwani|kurta|jodhpuri)[.]svg$/.test(image)));
   const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedVideoIndex,setSelectedVideoIndex]=useState(0);
   const [selectedSize,setSelectedSize]=useState('');
   const [shareStatus,setShareStatus]=useState('');
   const [related,setRelated]=useState<CatalogProduct[]>([]);
@@ -35,9 +36,15 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   const visual = images[selectedImage] || productImage(product);
   const siblings = getRelatedCollectionLinks(theme.collectionPath)
     .filter(link => link.path !== theme.collectionPath).slice(0, 5);
-  const videoUrl = garment.videoUrl;
+  const productVideos = Array.from(new Set([
+    ...(Array.isArray(garment.videoUrls)?garment.videoUrls:[]),
+    ...(garment.videoUrl?[garment.videoUrl]:[]),
+  ].filter((url):url is string=>typeof url==='string'&&/^https:\/\//i.test(url)))).slice(0,200);
+  const videoUrl = productVideos[selectedVideoIndex] || '';
   const playableVideo = typeof videoUrl === 'string' && /^https:\/\//i.test(videoUrl) &&
     (/\.(mp4|webm)(\?|$)/i.test(videoUrl) || videoUrl.includes('/storage/v1/object/public/nb-media-public/'));
+  const videoWindowStart=Math.max(0,Math.min(selectedVideoIndex-2,Math.max(0,productVideos.length-5)));
+  const visibleVideoIndexes=productVideos.map((_,index)=>index).slice(videoWindowStart,videoWindowStart+5);
   const call=callingContact(contactPhone);
   const original=garment.originalPrice??null;
   const discounted=garment.offerPrice!=null&&original!=null&&garment.offerPrice<original?garment.offerPrice:null;
@@ -122,12 +129,27 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
                   {selectedImage === index && <span className="absolute inset-x-1 bottom-1 h-[2px] bg-[#efc995]" aria-hidden="true"/>}
                 </button>)}
               </div>}
-              {videoUrl && <div className="mt-5 overflow-hidden border border-white/15 bg-[#1c1714]">
-                <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-[#e5c89e]">
-                  <Sparkles size={14}/> {siteText(home,'product.videoTitle')}
+              {productVideos.length>0 && <div className="mt-5 overflow-hidden border border-white/15 bg-[#1c1714]">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-[#e5c89e]">
+                  <span className="inline-flex items-center gap-2"><Sparkles size={14}/> {siteText(home,'product.videoTitle')}</span>
+                  <span>Clip {selectedVideoIndex+1} / {productVideos.length}</span>
                 </div>
-                {playableVideo ? <video src={videoUrl} controls preload="none" playsInline poster={images[0]}
-                  className="aspect-video w-full" aria-label={'Video of ' + product.title}/> :
+                {productVideos.length>1&&<div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3" role="group" aria-label="Choose product video">
+                  <button type="button" aria-label="Previous product video" disabled={selectedVideoIndex===0}
+                    onClick={()=>setSelectedVideoIndex(i=>Math.max(0,i-1))}
+                    className="flex h-10 w-10 items-center justify-center border border-white/25 text-white disabled:opacity-30"><ChevronLeft size={17}/></button>
+                  {visibleVideoIndexes.map(index=><button key={index} type="button"
+                    aria-label={'Play product video '+(index+1)} aria-pressed={selectedVideoIndex===index}
+                    onClick={()=>setSelectedVideoIndex(index)}
+                    className={'min-h-10 min-w-10 border px-3 text-xs font-semibold '+(selectedVideoIndex===index?'border-[#efc995] bg-[#efc995] text-[#241b16]':'border-white/25 text-white')}>
+                    {index+1}
+                  </button>)}
+                  <button type="button" aria-label="Next product video" disabled={selectedVideoIndex===productVideos.length-1}
+                    onClick={()=>setSelectedVideoIndex(i=>Math.min(productVideos.length-1,i+1))}
+                    className="flex h-10 w-10 items-center justify-center border border-white/25 text-white disabled:opacity-30"><ChevronRight size={17}/></button>
+                </div>}
+                {playableVideo ? <video key={videoUrl} src={videoUrl} controls preload="none" playsInline poster={images[0]}
+                  className="aspect-video w-full" aria-label={'Product video '+(selectedVideoIndex+1)+' of '+product.title}/> :
                   <a href={videoUrl} target="_blank" rel="noopener noreferrer"
                     className="flex min-h-20 items-center justify-center gap-3 text-sm font-medium text-white">{siteText(home,'product.videoCta')} <ArrowUpRight size={17}/></a>}
               </div>}
