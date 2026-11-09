@@ -22,7 +22,8 @@ const blank: Draft = {
 const fromPublished=(p:CmsProductRow):Draft=>({
   sku:p.sku,slug:p.slug,title:p.title,department:p.department,
   categoryPaths:p.category_paths||[],description:p.description||'',fabric:p.fabric||'',
-  sizes:p.sizes||[],imageUrls:p.image_urls||[],videoUrls:p.video_urls||[],videoUrl:p.video_url||'',
+  sizes:p.sizes||[],imageUrls:p.image_urls||[],videoUrls:p.video_urls||[],
+  videoUrl:p.video_url && !(p.video_urls||[]).includes(p.video_url) ? p.video_url : '',
   price:p.price===null?'':String(p.price),
   offerPrice:p.offer_price===null?'':String(p.offer_price),
   customizable:Boolean(p.customizable),sortRank:p.sort_rank||0,
