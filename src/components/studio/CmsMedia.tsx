@@ -99,7 +99,7 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
       const failed:File[]=[];
       let succeeded=0;
       results.forEach((result,index)=>{
-        if(result.ok)succeeded++;
+        if(result.ok===true)succeeded++;
         else{
           failed.push(files[index]);
           const message=result.error instanceof Error?result.error.message:'Upload failed.';
