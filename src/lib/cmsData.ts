@@ -15,6 +15,7 @@ export interface CmsProductRow {
   sizes: string[];
   image_urls: string[];
   video_url: string | null;
+  video_urls: string[];
   price: number | null;
   offer_price: number | null;
   customizable: boolean;
@@ -182,6 +183,7 @@ export function rowToProduct(row: CmsProductRow): CatalogProduct {
   };
   return { ...p, slug:row.slug,sku:row.sku,collectionPaths: row.category_paths || [], department: row.department,
     videoUrl: row.video_url && isSafeHttps(row.video_url) ? row.video_url : undefined,
+    videoUrls: Array.isArray(row.video_urls) ? row.video_urls.filter(isSafeHttps) : [],
     published: row.status === 'published',
     offerPrice:row.offer_price??undefined,
     originalPrice:row.price??undefined,
@@ -200,7 +202,7 @@ export async function loadPublishedData(): Promise<PublishedData> {
   try {
     const [productsResult, homeResult, categoriesResult] = await Promise.all([
       client.from('nb_products')
-        .select('id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,price,offer_price,customizable,status,sort_rank,created_at,updated_at')
+        .select('id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,video_urls,price,offer_price,customizable,status,sort_rank,created_at,updated_at')
         .eq('status','published').order('sort_rank', { ascending: true }).limit(12),
       client.from('nb_home_public').select('content').eq('key','home').maybeSingle(),
       client.from('nb_categories').select('path,department,label,description,image_url,active,sort_order').eq('active',true),
