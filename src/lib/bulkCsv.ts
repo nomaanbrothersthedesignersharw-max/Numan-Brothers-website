@@ -15,32 +15,48 @@ export interface CsvRow {
   };
   error: string|null;
 }
-const headerNames=['sku','title','department','category','sizes','fabric','description','price'];
 const categoryPaths=new Map(COLLECTION_ROUTES.map(c=>[c.path,c.department]));
 
 export function parseCsv(text:string):string[][] {
-  const source=text.replace(/^\uFEFF/,'');
-  const rows:string[][]=[];let row:string[]=[];let cell='';let quoted=false;
+  const source=text.replace(/^\\uFEFF/,'');
+  const rows:string[][]=[];let row:string[]=[];let cell='';let quoted=false;let quoteClosed=false;
+  const finishCell=()=>{row.push(cell);cell='';};
+  const finishRow=()=>{
+    finishCell();
+    if(row.some(x=>x.trim()))rows.push(row);
+    row=[];
+    if(rows.length>MAX_IMPORT_RECORDS+1)throw new Error('Import limit is 10,000 rows per CSV');
+  };
   for(let i=0;i<source.length;i++){
     const char=source[i];
     if(quoted){
       if(char==='"' && source[i+1]==='"'){cell+='"';i++;}
-      else if(char==='"')quoted=false;
+      else if(char==='"'){quoted=false;quoteClosed=true;}
       else cell+=char;
-    }else if(char==='"'){
+      continue;
+    }
+    if(quoteClosed){
+      if(char===','){finishCell();quoteClosed=false;}
+      else if(char==='\\n'||char==='\\r'){
+        if(char==='\\r'&&source[i+1]==='\\n')i++;
+        finishRow();quoteClosed=false;
+      }else if(char!==' '&&char!=='\\t'){
+        throw new Error('Unexpected character after a closing CSV quote');
+      }
+      continue;
+    }
+    if(char==='"'){
       if(cell.trim())throw new Error('Quote found in the middle of a CSV field');
       quoted=true;
-    }else if(char===','){row.push(cell);cell='';}
-    else if(char==='\n'||char==='\r'){
-      if(char==='\r'&&source[i+1]==='\n')i++;
-      row.push(cell);cell='';
-      if(row.some(x=>x.trim()))rows.push(row);
-      row=[];
-      if(rows.length>MAX_IMPORT_RECORDS+1)throw new Error('Import limit is 10,000 rows per CSV');
+    }else if(char===',')finishCell();
+    else if(char==='\\n'||char==='\\r'){
+      if(char==='\\r'&&source[i+1]==='\\n')i++;
+      finishRow();
     }else cell+=char;
   }
   if(quoted)throw new Error('Unclosed quoted CSV field');
   row.push(cell);if(row.some(x=>x.trim()))rows.push(row);
+  if(rows.length>MAX_IMPORT_RECORDS+1)throw new Error('Import limit is 10,000 rows per CSV');
   return rows;
 }
 export function validateCatalogueCsv(csv:string):CsvRow[]{
