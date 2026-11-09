@@ -42,7 +42,7 @@ function webpName(name: string): string {
  * original file rather than risking a broken garment photograph.
  */
 export async function prepareMediaFile(file: File): Promise<MediaPreparation> {
-  if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.type === 'image/webp') {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif') {
     return {
       file, originalBytes: file.size, preparedBytes: file.size,
       compressed: false, format: 'original',
