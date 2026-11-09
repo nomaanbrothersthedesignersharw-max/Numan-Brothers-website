@@ -1,6 +1,6 @@
 # Nomaan Brothers — Production storefront and CMS
 
-A mobile-first, browse-and-enquire catalogue for the traditional menswear and kidswear showroom in Mandi Bazar, Warangal. Built by Alif Growth Media. **The source of truth is the `main` branch. The SQL installer includes 18 ordered migrations plus live-client existing-table reconciliation.**
+A mobile-first, browse-and-enquire catalogue for the traditional menswear and kidswear showroom in Mandi Bazar, Warangal. Built by Alif Growth Media. **The source of truth is the `main` branch. The SQL installer includes 19 ordered migrations plus live-client existing-table reconciliation.**
 
 ## Deployment and connected services
 
