@@ -167,6 +167,11 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     return()=>clearTimeout(timer);
   },[id,form,dirty,persistDraft]);
   const open=async(entry:Entry)=>{
+    const currentId=latestIdRef.current;
+    if(currentId&&dirty){
+      const flushed=await persistDraft(currentId,latestFormRef.current);
+      if(!flushed)return;
+    }
     setIsNew(false);setId(entry.id);setPublishedSlug(null);setError(null);setMessage(null);setBusy(true);setDirty(false);setSaveState('idle');
     setRevisions([]);void loadRevisions(entry.id);
     const [draft,published]=await Promise.all([
@@ -209,7 +214,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     setSkuLoading(true);setError(null);
     const {data,error}=await client.rpc('nb_next_sku',{p_category_path:path});
     if(error)setError('Could not generate SKU: '+error.message);
-    else if(data){
+    else if(data&&latestFormRef.current.categoryPaths[0]===path){
       const sku=String(data);
       setForm(current=>{
         const oldAuto=[slugify(current.title),current.sku.toLowerCase()].filter(Boolean).join('-');
