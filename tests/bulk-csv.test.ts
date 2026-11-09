@@ -9,6 +9,18 @@ describe('Catalogue onboarding CSV parser',()=>{
   test('rejects incomplete quoted fields',()=>{
     expect(()=>parseCsv('sku,title\nNB-01,"Unclosed')).toThrow();
   });
+  test('rejects unexpected characters after a closing quote but allows delimiter whitespace',()=>{
+    expect(()=>parseCsv('sku,title\nNB-01,"Ivory"junk')).toThrow('Unexpected character after a closing CSV quote');
+    expect(()=>parseCsv('sku,title\nNB-01,"Ivory"x,other')).toThrow('Unexpected character after a closing CSV quote');
+    expect(parseCsv('sku,title\r\nNB-01,"Ivory" \t\r\n')).toEqual([
+      ['sku','title'],['NB-01','Ivory'],
+    ]);
+  });
+  test('strips a UTF-8 BOM and handles LF, CRLF and CR record endings',()=>{
+    expect(parseCsv('\uFEFFa,b\n1,2\r\n3,4\r5,6')).toEqual([
+      ['a','b'],['1','2'],['3','4'],['5','6'],
+    ]);
+  });
   test('normalizes SKU and validates correct department/category',()=>{
     const result=validateCatalogueCsv('sku,title,department,category,sizes\nnb-shw-01,Ivory Sherwani,men,/men/sherwani,38|40|42\n');
     expect(result[0].error).toBeNull();
@@ -53,5 +65,9 @@ describe('Catalogue onboarding CSV parser',()=>{
       .toContain('"Invalid ""price"""');
     expect(downloadCsvErrors([{rowNumber:3,sku:'NB-02',message:'=HYPERLINK(1)'}]))
       .toContain('"\'=HYPERLINK(1)"');
+    for(const dangerous of ['\\t=HYPERLINK(1)','\\r+1+1','\\n@SUM(1,2)','\\u0000-1+1','\\uFEFF=1+1']){
+      expect(downloadCsvErrors([{rowNumber:4,sku:'NB-03',message:dangerous}]))
+        .toContain('"\\''+dangerous+'"');
+    }
   });
 });
