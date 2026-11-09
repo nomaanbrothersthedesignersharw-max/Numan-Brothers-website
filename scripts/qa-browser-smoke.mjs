@@ -159,8 +159,10 @@ async function inspect(route,width=390,height=844,opts={}){
         .evaluate(el=>window.scrollTo(0,el.getBoundingClientRect().bottom+window.scrollY+160));
       const dock=page.getByTestId('floating-contact-dock');
       await dock.waitFor({state:'visible',timeout:8000});
-      assert.ok(await dock.locator('a').count()>0,'production must always expose a real contact action');
-      console.log('PASS_LIVE_CONTACT_DOCK',JSON.stringify({base,width,links:await dock.locator('a').count()}));
+      const contactLinks=await dock.locator('a').evaluateAll(links=>links.map(link=>link.getAttribute('href')||''));
+      assert.ok(contactLinks.some(href=>href==='/contact'||href.startsWith('tel:+')||href.startsWith('https://wa.me/')),
+        'production must expose a working showroom, phone or WhatsApp action without inventing contact details');
+      console.log('PASS_LIVE_CONTACT_DOCK',JSON.stringify({base,width,links:contactLinks}));
     }
     if(!opts.reduce && (!opts.matrix || [280,390,768,1024,1920].includes(width)) && (route==='/' || route==='/studio' || (width===390 && route==='/men/sherwani'))){
       const name=(live?'live-':'local-')+route.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').replace(/^$/,'home')+'-'+width+'.png';
