@@ -1,6 +1,6 @@
 # Nomaan Brothers — Release Acceptance and Go/No-Go Ledger
 
-<badge>NO-GO — NOT YET PRODUCTION-COMMISSIONED</badge>
+**Release status: NO-GO — NOT YET PRODUCTION-COMMISSIONED.**
 
 A Vercel deployment marked READY proves that an artifact deployed; it does not prove that the store is commercially, operationally or security ready. Audit date: 2026-11-09.
 
