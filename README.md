@@ -1,6 +1,6 @@
 # Nomaan Brothers — Production storefront and CMS
 
-A mobile-first, browse-and-enquire catalogue for the traditional menswear and kidswear showroom in Mandi Bazar, Warangal. Built by Alif Growth Media. **The source of truth is the `main` branch. The SQL installer includes 16 ordered migrations plus live-client existing-table reconciliation.**
+A mobile-first, browse-and-enquire catalogue for the traditional menswear and kidswear showroom in Mandi Bazar, Warangal. Built by Alif Growth Media. **The source of truth is the `main` branch. The SQL installer includes 17 ordered migrations plus live-client existing-table reconciliation.**
 
 ## Deployment and connected services
 
@@ -65,7 +65,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY
 - [Production operations and commissioning](docs/OPERATIONS.md)
 - [Studio user guide](docs/CMS_USER_GUIDE.md)
 - [Client handoff and single-project operating notes](docs/CLIENT_ONBOARDING.md)
-- [One-paste new-project SQL (16 migrations)](supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql)
+- [One-paste new-project SQL (17 migrations)](supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql)
 - [One-time owner role SQL after creating Auth user](supabase/sql-editor/NOMAN_BROTHERS_ASSIGN_OWNER_AFTER_AUTH.sql)
 - [SQL Editor installation and migrations](docs/NOMAN_SQL_EDITOR_COPY_PASTE.md)
 - [Cinematic intro and video upload](docs/2026-11-09-cinematic-hero-production.md)
