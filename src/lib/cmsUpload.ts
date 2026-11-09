@@ -83,6 +83,7 @@ type UploadOptions = {
   department?:'men'|'kids'|null;
   categoryPath?:string|null;
   onPreparing?:()=>void;
+  onPreparing?:()=>void;
   onPrepared?:(result:MediaPreparation)=>void;
 };
 function isMatchingExisting(existing:CmsMediaRow,file:File):boolean {
@@ -136,6 +137,7 @@ export async function uploadCmsFile(
   }
 
   if(!alreadyStored){
+    options?.onPreparing?.();
     options?.onPreparing?.();
     prepared=await prepareMediaFile(file);
     uploadFile=prepared.file;
