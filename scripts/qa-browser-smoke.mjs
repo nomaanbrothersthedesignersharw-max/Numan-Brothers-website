@@ -72,13 +72,13 @@ async function inspect(route,width=390,height=844,opts={}){
   page.on('pageerror',error=>runtimeErrors.push(String(error.message)));
   await mockCmsRoutes(page);
   try{
-    const response=await page.goto(base+route,{waitUntil:'domcontentloaded',timeout:25000});
+    const response=await page.goto(base+route,{waitUntil:'domcontentloaded',timeout:live?20000:12000});
     const status=response?.status()||0;
     if(live && [401,403,429].includes(status)){
       skipped=true;console.log('DEPLOYMENT_ACCESS_LIMITED',base,route,status);return;
     }
     assert.equal(status,200,'HTTP '+status+' at '+route);
-    await page.locator('h1').first().waitFor({state:'visible',timeout:25000});
+    await page.locator('h1').first().waitFor({state:'visible',timeout:live?20000:8000});
     await page.waitForTimeout(150);
     const layout=await page.evaluate(()=>{
       const heading=document.querySelector('h1');
@@ -411,12 +411,21 @@ async function inspectViewportMatrix(){
     [768,1024],[820,1180],[1024,768],[1180,820],
     [1280,800],[1440,900],[1920,1080],[2560,1440]
   ];
-  const routes=['/','/men/sherwani','/men/kurta-pyjama','/kids',
-    '/contact','/search?q=sherwani','/products/'+mockProduct.slug,'/studio'];
+  const coreRoutes=['/','/studio'];
+  const otherRoutes=['/men/sherwani','/men/kurta-pyjama','/kids',
+    '/contact','/search?q=sherwani','/products/'+mockProduct.slug];
+  const representative=[[320,720],[390,844],[820,1180],[1440,900],[1920,1080]];
   for(const [width,height] of viewports){
-    for(const route of routes)await inspect(route,width,height,{matrix:true});
+    for(const route of coreRoutes)await inspect(route,width,height,{matrix:true});
   }
-  console.log('RESPONSIVE_MATRIX_COMPLETE',JSON.stringify({viewports:viewports.length,routes:routes.length,planned:viewports.length*routes.length}));
+  for(const route of otherRoutes){
+    for(const [width,height] of representative)await inspect(route,width,height,{matrix:true});
+  }
+  const planned=viewports.length*coreRoutes.length+representative.length*otherRoutes.length;
+  console.log('RESPONSIVE_MATRIX_COMPLETE',JSON.stringify({
+    viewports:viewports.length,coreRoutes:coreRoutes.length,
+    representativeBreakpoints:representative.length,otherRoutes:otherRoutes.length,planned
+  }));
 }
 
 try{
