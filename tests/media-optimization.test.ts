@@ -7,7 +7,7 @@ describe('upload preparation UX contract',()=>{
     const upload=readFileSync(new URL('../src/lib/cmsUpload.ts',import.meta.url),'utf8');
     const media=readFileSync(new URL('../src/components/studio/CmsMedia.tsx',import.meta.url),'utf8');
     expect(upload).toContain('options?.onPreparing?.()');
-    expect(upload.match(/options\\?\\.onPreparing\\?\\.\\(\\)/g)||[]).toHaveLength(1);
+    expect(upload.split('options?.onPreparing?.()').length-1).toBe(1);
     expect(media).toContain("status:'preparing'");
     expect(media).toContain('runWithConcurrency(files,2');
     expect(media).toContain('Optimizing image…');
