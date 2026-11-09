@@ -70,7 +70,8 @@ declare metrics record;
         blocked boolean := false;
 begin
   select * into metrics from public.nb_catalogue_health();
-  if metrics.published_products <> 1 or metrics.approved_assets <> 1 then
+  -- One approved image and one approved video are now both first-class media assets.
+  if metrics.published_products <> 1 or metrics.approved_assets <> 2 then
     raise exception 'Manager health metrics invalid';
   end if;
   if (select count(*) from public.nb_audit_events) < 2 then
