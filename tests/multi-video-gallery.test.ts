@@ -28,6 +28,9 @@ describe('multi-video product gallery contract',()=>{
     expect(sql).toContain('cardinality(product_videos) > 200');
     expect(sql).toContain("mime_type like 'video/%'");
     expect(sql).toContain('video_urls = excluded.video_urls');
+    expect(sql).toContain('offer_price = excluded.offer_price');
+    expect(sql).toContain('customizable = excluded.customizable');
+    expect(sql).toContain("product_offer := nullif(draft->>'offerPrice','')::numeric");
     expect(sql).toContain('public.nb_media_public_url(m.storage_path)');
     expect(sql).toContain("draft->'videoUrls'");
   });
