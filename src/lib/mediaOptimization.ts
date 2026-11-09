@@ -6,6 +6,26 @@ export interface MediaPreparation {
   format: 'webp' | 'original';
 }
 
+export type BatchResult<T> = { ok:true; value:T } | { ok:false; error:unknown };
+/** Run independent uploads with bounded concurrency while preserving input order. */
+export async function runWithConcurrency<T,R>(
+  items:readonly T[],limit:number,worker:(item:T,index:number)=>Promise<R>,
+):Promise<BatchResult<R>[]>{
+  if(!Number.isInteger(limit)||limit<1)throw new Error('Concurrency must be a positive integer');
+  const results:BatchResult<R>[] = new Array(items.length);
+  let cursor=0;
+  const run=async()=>{
+    while(true){
+      const index=cursor++;
+      if(index>=items.length)return;
+      try{results[index]={ok:true,value:await worker(items[index],index)};}
+      catch(error){results[index]={ok:false,error};}
+    }
+  };
+  await Promise.all(Array.from({length:Math.min(limit,items.length)},()=>run()));
+  return results;
+}
+
 const MAX_IMAGE_EDGE = 2400;
 const WEBP_QUALITY = 0.84;
 const SKIP_COMPRESSION_BELOW = 512 * 1024;
