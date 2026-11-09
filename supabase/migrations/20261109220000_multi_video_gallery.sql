@@ -38,6 +38,8 @@ declare
   product_video text;
   product_videos text[];
   product_price numeric;
+  product_offer numeric;
+  product_customizable boolean;
 begin
   if not public.nb_can_publish() then
     raise exception 'Not authorized to publish' using errcode = '42501';
@@ -129,16 +131,21 @@ begin
     raise exception 'Videos must use HTTPS';
   end if;
   product_price := nullif(draft->>'price','')::numeric;
+  product_offer := nullif(draft->>'offerPrice','')::numeric;
+  product_customizable := coalesce((draft->>'customizable')::boolean,false);
   if product_price is not null and product_price < 0 then
     raise exception 'Price cannot be negative';
   end if;
+  if product_offer is not null and (product_price is null or product_offer < 0 or product_offer >= product_price) then
+    raise exception 'Offer price must be non-negative and lower than the original price';
+  end if;
   insert into public.nb_products (
     id,sku,slug,title,department,category_paths,description,fabric,sizes,
-    image_urls,video_url,video_urls,price,status,sort_rank,published_at,created_by
+    image_urls,video_url,video_urls,price,offer_price,customizable,status,sort_rank,published_at,created_by
   ) values (
     p_product_id,product_sku,product_slug,product_title,product_dept,paths,
     coalesce(draft->>'description',''),coalesce(draft->>'fabric',''),sizes_value,
-    photos,product_video,product_videos,product_price,'published',
+    photos,product_video,product_videos,product_price,product_offer,product_customizable,'published',
     coalesce((draft->>'sortRank')::integer,0),now(),auth.uid()
   )
   on conflict (id) do update set
@@ -147,6 +154,7 @@ begin
     description = excluded.description, fabric = excluded.fabric,
     sizes = excluded.sizes, image_urls = excluded.image_urls,
     video_url = excluded.video_url, video_urls = excluded.video_urls, price = excluded.price,
+    offer_price = excluded.offer_price, customizable = excluded.customizable,
     status = 'published', sort_rank = excluded.sort_rank, published_at = now();
   select coalesce(max(version),0)+1 into next_version
     from public.nb_product_revisions where product_id = p_product_id;
