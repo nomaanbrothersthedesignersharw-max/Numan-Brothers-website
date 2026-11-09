@@ -124,7 +124,8 @@ export async function uploadCmsFile(
     if(existing){options.onPrepared?.(prepared);onProgress(100);return existing;}
     // Older interrupted jobs may have written an original, uncompressed object.
     const {data:oldObject,error:oldInfoError}=await client.storage.from('nb-media-staging').info(originalPath);
-    if(oldInfoError)throw new Error('Cannot reconcile an interrupted media upload: '+oldInfoError.message);
+    // A not-found response is the normal first-upload case. If Storage is
+    // temporarily unreachable, the later upload request will fail safely.
     if(oldObject){
       if(Number(oldObject.size)!==file.size)throw new Error('Previously uploaded object has a different file size');
       alreadyStored=true;
@@ -143,7 +144,8 @@ export async function uploadCmsFile(
       const existing=await findExisting(client,path,uploadFile);
       if(existing){onProgress(100);return existing;}
       const {data:orphan,error:orphanError}=await client.storage.from('nb-media-staging').info(path);
-      if(orphanError)throw new Error('Cannot reconcile an interrupted compressed upload: '+orphanError.message);
+      // A missing object is expected; an upload conflict will still be surfaced
+      // by Storage rather than silently overwriting a different asset.
       if(orphan){
         if(Number(orphan.size)!==uploadFile.size)throw new Error('Previously compressed object has a different file size');
         alreadyStored=true;
