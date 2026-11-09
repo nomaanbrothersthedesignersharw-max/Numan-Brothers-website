@@ -51,6 +51,7 @@ describe('CMS migration guardrails (static checks; deploy requires live RLS veri
   test('consolidates equivalent CMS RLS policies without broadening access', () => {
     expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_media_editor_update_pending');
     expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_media_publisher_update');
+    expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_media_staff_update');
     expect(policyRemediation).toContain('CREATE POLICY nb_media_staff_update');
     expect(policyRemediation).toContain('(SELECT public.nb_can_publish())');
     expect(policyRemediation).toContain('NOT approved');
@@ -58,6 +59,7 @@ describe('CMS migration guardrails (static checks; deploy requires live RLS veri
     expect(policyRemediation).toContain("split_part(storage_path,'/',1)");
     expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_reviews_public_read');
     expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_reviews_staff_read');
+    expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_reviews_authenticated_read');
     expect(policyRemediation).toContain('CREATE POLICY nb_reviews_public_read');
     expect(policyRemediation).toContain('FOR SELECT TO anon');
     expect(policyRemediation).toContain('CREATE POLICY nb_reviews_authenticated_read');
