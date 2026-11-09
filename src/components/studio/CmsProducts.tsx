@@ -10,19 +10,19 @@ import {ErrorText,Field,inputClass,outlineClass,primaryClass} from './StudioShar
 interface Props {client:SupabaseClient;userId:string;canPublish:boolean;}
 interface Draft {
   sku:string;slug:string;title:string;department:'men'|'kids';categoryPaths:string[];
-  description:string;fabric:string;sizes:string[];imageUrls:string[];videoUrl:string;
+  description:string;fabric:string;sizes:string[];imageUrls:string[];videoUrls:string[];videoUrl:string;
   price:string;offerPrice:string;customizable:boolean;sortRank:number;
 }
 type ProductRevision={id:number;version:number;published_at:string;content:unknown};
 type Entry={id:string;label:string;sku:string;live:boolean;draft:boolean;form:Draft};
 const blank: Draft = {
   sku:'',slug:'',title:'',department:'men',categoryPaths:[],description:'',
-  fabric:'',sizes:[],imageUrls:[],videoUrl:'',price:'',offerPrice:'',customizable:false,sortRank:0,
+  fabric:'',sizes:[],imageUrls:[],videoUrls:[],videoUrl:'',price:'',offerPrice:'',customizable:false,sortRank:0,
 };
 const fromPublished=(p:CmsProductRow):Draft=>({
   sku:p.sku,slug:p.slug,title:p.title,department:p.department,
   categoryPaths:p.category_paths||[],description:p.description||'',fabric:p.fabric||'',
-  sizes:p.sizes||[],imageUrls:p.image_urls||[],videoUrl:p.video_url||'',
+  sizes:p.sizes||[],imageUrls:p.image_urls||[],videoUrls:p.video_urls||[],videoUrl:p.video_url||'',
   price:p.price===null?'':String(p.price),
   offerPrice:p.offer_price===null?'':String(p.offer_price),
   customizable:Boolean(p.customizable),sortRank:p.sort_rank||0,
@@ -35,6 +35,7 @@ const fromUnknown=(value:unknown):Draft=>{
     categoryPaths:Array.isArray(d.categoryPaths)?d.categoryPaths.filter((x):x is string=>typeof x==='string'):[],
     imageUrls:Array.isArray(d.imageUrls)?d.imageUrls.filter((x):x is string=>typeof x==='string'):[],
     sizes:Array.isArray(d.sizes)?d.sizes.filter((x):x is string=>typeof x==='string'):[],
+    videoUrls:Array.isArray(d.videoUrls)?d.videoUrls.filter((x):x is string=>typeof x==='string').slice(0,200):[],
     price:typeof d.price==='string'?d.price:'',
     offerPrice:typeof d.offerPrice==='string'?d.offerPrice:'',
     customizable:Boolean(d.customizable),
@@ -52,6 +53,9 @@ function validate(form:Draft):string|null {
   if(!form.categoryPaths.length)return 'Choose at least one collection before publishing.';
   if(!form.imageUrls.length)return 'Choose at least one approved product photograph.';
   if(form.videoUrl && !isSafeHttps(form.videoUrl))return 'The optional video link must use HTTPS.';
+  if(form.videoUrls.length>200)return 'A product can have at most 200 video references.';
+  if(form.videoUrls.some(url=>!isSafeHttps(url)))return 'Every video URL must use HTTPS.';
+  if(form.videoUrl && !form.videoUrls.includes(form.videoUrl) && form.videoUrls.length>=200)return 'A product can have at most 200 video references.';
   if(form.price && (!Number.isFinite(Number(form.price))||Number(form.price)<0))return 'Enter a valid original price.';
   if(form.offerPrice && (!form.price||!Number.isFinite(Number(form.offerPrice))||
     Number(form.offerPrice)<0||Number(form.offerPrice)>=Number(form.price)))
@@ -390,11 +394,12 @@ export default function CmsProducts({client,userId,canPublish}:Props){
             <p className="text-xs leading-6 text-stone-600">Drag photos here—an authorized owner upload is approved and attached automatically. For bulk imports, use the exact SKU, e.g. {form.sku||'NB-SH-00001'}_01.jpg. The trash icon only detaches a photo; it does not delete the library copy.</p>
             <AssetEditor client={client} userId={userId} canPublish={canPublish} label="Product photos · first is the cover" multiple department={form.department} categoryPath={form.categoryPaths[0]||''}
               selected={form.imageUrls} onChange={urls=>update('imageUrls',urls)}/>
-            <AssetEditor client={client} userId={userId} canPublish={canPublish} label="Optional garment video"
-              allowVideo department={form.department} categoryPath={form.categoryPaths[0]||''}
-              selected={form.videoUrl?[form.videoUrl]:[]} onChange={urls=>update('videoUrl',urls[0]||'')}/>
+            <AssetEditor client={client} userId={userId} canPublish={canPublish} label="Product video library · up to 200 clips, loaded on demand"
+              multiple allowVideo department={form.department} categoryPath={form.categoryPaths[0]||''}
+              selected={form.videoUrls} onChange={urls=>update('videoUrls',urls.slice(0,200))}/>
           </div>
-          <Field label="Or external HTTPS video / streaming link"><input type="url" className={inputClass} value={form.videoUrl} onChange={e=>update('videoUrl',e.target.value)} placeholder="https://..."/></Field>
+          <p className="text-xs leading-6 text-stone-600">Video references are saved in order. Only the selected clip is loaded on the public product page; 100–200 video players are never loaded at once. Keep clips short and optimized. You may also add one external streaming link below.</p>
+          <Field label="Optional external HTTPS video / streaming link"><input type="url" className={inputClass} value={form.videoUrl} onChange={e=>update('videoUrl',e.target.value)} placeholder="https://..."/></Field>
           <section aria-labelledby="product-revisions-title" className="space-y-3 rounded-lg border border-[#ded0bc] bg-[#faf7f0] p-5">
             <h4 id="product-revisions-title" className="font-serif text-xl text-[#31261c]">Published history</h4>
             <p className="text-xs leading-6 text-[#76685b]">Each publish creates a numbered, read-only snapshot. Editing a private draft does not change an earlier published version. Reverting requires an authorized reviewed new publication.</p>
