@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 const sql = readFileSync(new URL('../supabase/migrations/20261107060000_nomaan_cms.sql', import.meta.url),'utf8');
 const phase2 = readFileSync(new URL('../supabase/migrations/20261107130000_catalogue_private_media.sql', import.meta.url),'utf8');
+const policyRemediation = readFileSync(new URL('../supabase/migrations/20261109213000_consolidate_cms_rls_policies.sql', import.meta.url),'utf8');
 describe('CMS migration guardrails (static checks; deploy requires live RLS verification)', () => {
   test('has RLS on every public CMS table', () => {
     for (const table of ['nb_products','nb_categories','nb_media','nb_product_drafts','nb_product_revisions','nb_home_drafts','nb_home_public','nb_home_revisions']) {
@@ -46,5 +47,26 @@ describe('CMS migration guardrails (static checks; deploy requires live RLS veri
   test('scopes storage uploads to authenticated user and dedicated bucket', () => {
     expect(sql).toContain("bucket_id = 'nb-media'");
     expect(sql).toContain("(storage.foldername(name))[1] = (select auth.uid())::text");
+  });
+  test('consolidates equivalent CMS RLS policies without broadening access', () => {
+    expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_media_editor_update_pending');
+    expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_media_publisher_update');
+    expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_media_staff_update');
+    expect(policyRemediation).toContain('CREATE POLICY nb_media_staff_update');
+    expect(policyRemediation).toContain('(SELECT public.nb_can_publish())');
+    expect(policyRemediation).toContain('NOT approved');
+    expect(policyRemediation).toContain('uploaded_by=(SELECT auth.uid())');
+    expect(policyRemediation).toContain("split_part(storage_path,'/',1)");
+    expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_reviews_public_read');
+    expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_reviews_staff_read');
+    expect(policyRemediation).toContain('DROP POLICY IF EXISTS nb_reviews_authenticated_read');
+    expect(policyRemediation).toContain('CREATE POLICY nb_reviews_public_read');
+    expect(policyRemediation).toContain('FOR SELECT TO anon');
+    expect(policyRemediation).toContain('CREATE POLICY nb_reviews_authenticated_read');
+    expect(policyRemediation).toContain('FOR SELECT TO authenticated');
+    expect(policyRemediation).toContain("status='approved'");
+    expect(policyRemediation).toContain('(SELECT public.nb_can_edit())');
+    const anonReadPolicy = policyRemediation.split('CREATE POLICY nb_reviews_public_read')[1]?.split(';')[0] || '';
+    expect(anonReadPolicy).not.toContain('nb_can_edit');
   });
 });

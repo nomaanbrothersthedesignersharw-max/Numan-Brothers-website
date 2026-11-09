@@ -1,5 +1,9 @@
 name: Website quality gate
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   pull_request:
   push:
@@ -58,7 +62,7 @@ jobs:
           fi
       - name: Client onboarding preflight contract tests
         run: node --test tests/client-preflight.test.mjs
-      - name: Verify complete SQL Editor installer matches all sixteen source migrations
+      - name: Verify complete SQL Editor installer matches all eighteen source migrations
         run: node --test tests/sql-editor-bundle.test.mjs
       - name: PostgreSQL CMS role and publishing test
         env:
@@ -133,19 +137,12 @@ jobs:
             sleep 1
           done
           node scripts/qa-browser-smoke.mjs
-      - name: Test live customer website after main deploy
+      - name: Test live storefront and same-origin Studio after main deploy
         if: github.ref == 'refs/heads/main'
         env:
           NODE_PATH: /tmp/nb-browser/node_modules
           NB_MODE: live
-          NB_TEST_URL: https://numan-brothers-website.vercel.app
-        run: node scripts/qa-browser-smoke.mjs
-      - name: Test live Studio deployment after main deploy
-        if: github.ref == 'refs/heads/main'
-        env:
-          NODE_PATH: /tmp/nb-browser/node_modules
-          NB_MODE: live
-          NB_TEST_URL: https://numan-brothers-cms-showroom.vercel.app
+          NB_TEST_URL: https://numan-brothers-website-nine.vercel.app
         run: node scripts/qa-browser-smoke.mjs
       - name: Retain mobile and desktop screenshots
         if: always()
@@ -155,79 +152,3 @@ jobs:
           path: artifacts/browser/
           retention-days: 14
           if-no-files-found: ignore
-
-  cleanup-merged-working-branches:
-    name: Remove safely merged temporary branches
-    needs: [typecheck-and-build, browser-ui-smoke]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-      pull-requests: read
-    steps:
-      - name: Verify merged PRs and delete unchanged working branch refs
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          python3 - <<'PY'
-          import json, os, urllib.request, urllib.error, urllib.parse
-          repo=os.environ['GITHUB_REPOSITORY']
-          token=os.environ['GH_TOKEN']
-          base=f'https://api.github.com/repos/{repo}'
-          headers={
-              'Authorization':'Bearer '+token,
-              'Accept':'application/vnd.github+json',
-              'X-GitHub-Api-Version':'2022-11-28',
-              'User-Agent':'nomaan-safe-merged-branch-maintenance',
-          }
-
-          def api(path,method='GET'):
-              req=urllib.request.Request(base+path,headers=headers,method=method)
-              with urllib.request.urlopen(req,timeout=25) as response:
-                  raw=response.read()
-                  return json.loads(raw) if raw else None
-
-          def pages(endpoint):
-              result=[]
-              for page in range(1,11):
-                  chunk=api(f'{endpoint}&page={page}')
-                  if not isinstance(chunk,list): raise RuntimeError('Unexpected GitHub API response')
-                  result.extend(chunk)
-                  if len(chunk)<100:break
-              return result
-
-          branches=pages('/branches?per_page=100')
-          prs=pages('/pulls?state=closed&per_page=100')
-          removed=[];skipped=[]
-          for branch in branches:
-              name=branch['name']
-              if name=='main':continue
-              # Intentionally refuse unrecognized, unmerged, modified or
-              # protected branches. Never force-delete a remote ref.
-              if not (name.startswith('agm/') or name=='sql-existing-tables-completion-20261109' or name=='vercel/install-vercel-web-analytics-c8r0zh') or branch.get('protected'):
-                  skipped.append((name,'not an authorized unprotected working branch'))
-                  continue
-              eligible=[
-                  pr for pr in prs
-                  if pr.get('merged_at')
-                  and pr.get('base',{}).get('ref')=='main'
-                  and pr.get('head',{}).get('ref')==name
-                  and (pr.get('head',{}).get('repo') or {}).get('full_name')==repo
-                  and pr.get('head',{}).get('sha')==branch['commit']['sha']
-              ]
-              if not eligible:
-                  skipped.append((name,'not proven identical to a merged PR head'))
-                  continue
-              encoded=urllib.parse.quote(name,safe='/')
-              api('/git/refs/heads/'+encoded,'DELETE')
-              removed.append(name)
-              print('Deleted verified merged branch:',name)
-          for name,reason in skipped:print('Kept',name,':',reason)
-          remaining=[b['name'] for b in pages('/branches?per_page=100')]
-          print('Remaining branches:',', '.join(remaining))
-          print('Removed count:',len(removed),'Unverified retained:',len(skipped))
-          if skipped:
-              raise SystemExit('Some branches were retained because deletion safety could not be verified.')
-          PY

@@ -52,7 +52,7 @@ export default function V2Reviews(){
          <footer className="mt-6 border-t border-stone-200 pt-4 text-xs font-semibold">{item.display_name} · Website submission</footer>
        </blockquote>)}
      </div>:<p className="mt-10 rounded-xl border border-dashed border-[#bca484] bg-[#f8f3eb] p-6 text-sm leading-7">
-       No first-party reviews have been published yet. You can read the external Google listing or submit your experience below.
+       No first-party reviews have been published yet. You can read the independent Justdial listing or submit your experience below.
      </p>}
      <div className="mt-12 grid gap-8 border-t border-[#d6c4ad] pt-12 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]">
        <div><h3 className="font-serif text-3xl">Share your experience</h3>

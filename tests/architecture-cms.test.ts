@@ -8,9 +8,14 @@ import { getCollection } from '../src/storefront/navigation';
 const productStudio = readFileSync(new URL('../src/components/studio/CmsProducts.tsx',import.meta.url),'utf8');
 const homepageStudio = readFileSync(new URL('../src/components/studio/CmsHomepage.tsx',import.meta.url),'utf8');
 const app = readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
+const main = readFileSync(new URL('../src/main.tsx',import.meta.url),'utf8');
 const sql = readFileSync(new URL('../supabase/migrations/20261107223000_category_media_publish_guard.sql',import.meta.url),'utf8');
 
 describe('Catalogue-only release architecture and CMS readiness',()=>{
+  test('mounts Vercel Analytics exactly once for the whole SPA',()=>{
+    expect(app).not.toContain('Analytics');
+    expect(main.match(/<Analytics\s*\/>/g) || []).toHaveLength(1);
+  });
   test('does not accidentally expose old checkout and client-side payment in the new storefront',()=>{
     expect(existsSync(new URL('../src/components/CartDrawer.tsx',import.meta.url))).toBe(false);
     expect(existsSync(new URL('../src/components/AdminPortal.tsx',import.meta.url))).toBe(false);

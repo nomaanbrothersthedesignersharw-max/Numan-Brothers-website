@@ -1,15 +1,16 @@
 # Nomaan Brothers — Production storefront and CMS
 
-A mobile-first, browse-and-enquire catalogue for the traditional menswear and kidswear showroom in Mandi Bazar, Warangal. Built by Alif Growth Media. **The source of truth is the `main` branch. The SQL installer includes 16 ordered migrations plus live-client existing-table reconciliation.**
+A mobile-first, browse-and-enquire catalogue for the traditional menswear and kidswear showroom in Mandi Bazar, Warangal. Built by Alif Growth Media. **The source of truth is the `main` branch. The SQL installer includes 18 ordered migrations plus live-client existing-table reconciliation.**
 
-## Live services
+## Deployment and connected services
 
-- Customer storefront: https://numan-brothers-website.vercel.app/
-- Staff CMS: https://numan-brothers-cms-showroom.vercel.app/studio
-- GitHub: https://github.com/helloalifstudio-coder/Numan-Brothers-website
-- Data: dedicated Nomaan Brothers Supabase project, with Auth, RLS, PostgreSQL and approved media storage.
+- Public storefront: https://numan-brothers-website-nine.vercel.app/
+- Staff Studio: https://numan-brothers-website-nine.vercel.app/studio (same Vite/Vercel project; there is no separate CMS deployment).
+- Source repository: https://github.com/nomaanbrothersthedesignersharw-max/Numan-Brothers-website
+- Hosting: one Vercel project, `numan-brothers-website`, connected to this repository.
+- Database/API: Supabase project `uinhybkdzevpxnugtvzf` (US East, PostgreSQL 17).
 
-**What is live vs pending:** A responsive public website and Studio are deployed. Some content cannot be completed without client approval: real photos and brand film, verified social links, approved privacy/return/terms statements and actual garments. Decorative sample artwork is illustrative; the Plain Sherwani demo is labeled **NOT FOR SALE**, not database stock. Payments, POS and accurate inventory are outside this catalogue's scope.
+**Current commissioning status:** The frontend deployment is READY, but a deployment marked READY is not proof of business go-live. The active Supabase project contains the CMS schema, 23 category records, one published homepage row and one homepage draft row. It currently has no products, product drafts, media records, Storage objects or customer reviews. The media-approval Edge Function is not yet deployed. Real garment photography, verified contact numbers/social accounts, owner-approved policy text, a custom domain, staff-account verification and a tested restore/load plan remain release gates. The sample Plain Sherwani page is clearly marked **DEMO / NOT FOR SALE**. Payments, POS and accurate inventory are outside this catalogue's scope.
 
 ## Features
 
@@ -20,7 +21,7 @@ A mobile-first, browse-and-enquire catalogue for the traditional menswear and ki
 - First-party customer reviews held pending until an authorized staff member moderates them.
 - CMS for editable published garments, permanent server-generated SKU identities, Men/Kids category media, photo auto-labeling, bulk CSV import with optional SKU, owner approval, homepage text, social URL and revision history.
 - Read-only storefront access to published records; restricted Supabase row-level and Storage policies.
-- GitHub Actions typecheck, tests, PostgreSQL permission checks, production build and 18-breakpoint Chromium smoke checks, including live deployments.
+- GitHub Actions typecheck, tests, PostgreSQL permission checks, production build and 18-viewport Chromium smoke checks. CodeQL and Dependabot are configured on the audit branch and become active after merge.
 
 ## Local development
 
@@ -47,24 +48,24 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_KEY
 ## Operating the live CMS
 
 1. In Supabase Auth, provision a verified staff email and assign a server-controlled `app_metadata.nb_role` of `owner`, `admin` or `editor` as appropriate; user metadata does not grant publisher access.
-2. Open **Studio → Website CMS**. Upload and approve media via the Media workflow, select imagery and a compressed brand film, and edit text, profiles or policies.
+2. Open **Studio → Website CMS**. Homepage text/contact fields can be maintained. Media approval is not yet operational: the `nb-media-approval` Supabase Edge Function must first be deployed and tested before uploaded files are approved for publication.
 3. For Instagram, enter the shop owner’s official HTTPS profile in Studio → Website CMS → Footer. Host validation rejects unrelated destinations. **Save draft → Publish website changes**.
 4. Products: choose Men’s/Kids’ category first to reserve NB-SH-00001-style permanent SKU, attach approved photographs, save private draft and publish. Search any live product by SKU, edit details/photos and select **Update published product**. Bulk CSV may leave SKU blank; export generated SKU mapping, assign camera photo batches to a single SKU, approve and match images before publishing.
 5. Review incoming customer feedback under **Customer Reviews**. Public submissions stay pending; approve genuine reviews only.
-6. Review both Vercel deployments and the GitHub Actions quality gate before changing production traffic.
+6. Review the single Vercel project deployment, the GitHub Actions quality gate and the Supabase Edge Function status before changing production traffic.
 
 ## Branch policy
 
-`main` is the only persistent branch. For substantial changes, open a short-lived pull request branch and merge after quality checks. A post-success GitHub Actions maintenance job checks each temporary `agm/` branch against its **exact unchanged merged PR head** and deletes it; unmerged, protected, or modified work is preserved. No extra Netlify builds or previews are created.
+`main` is the release branch. For substantial changes, open a short-lived pull request branch and merge only after all required quality checks pass. Delete merged working branches manually after verifying the exact merged PR; CI does not automatically delete remote branches.
 
-**Admin follow-up:** Configure GitHub branch protection/rulesets for `main` (required status checks, prevent force pushes, approved changes where appropriate); that repository setting is separate from source code.
+**Admin follow-up:** Configure GitHub branch protection/rulesets for `main` (required quality checks, prevent force pushes and restrict bypass). The connected GitHub integration cannot currently read or change branch protection settings, so this must be verified in GitHub repository settings.
 
 ## Documentation
 
 - [Production operations and commissioning](docs/OPERATIONS.md)
 - [Studio user guide](docs/CMS_USER_GUIDE.md)
-- [Standalone client handoff, single production Supabase and one owner login](docs/CLIENT_ONBOARDING.md)
-- [One-paste new-project SQL (16 migrations)](supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql)
+- [Client handoff and single-project operating notes](docs/CLIENT_ONBOARDING.md)
+- [One-paste new-project SQL (18 migrations)](supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql)
 - [One-time owner role SQL after creating Auth user](supabase/sql-editor/NOMAN_BROTHERS_ASSIGN_OWNER_AFTER_AUTH.sql)
 - [SQL Editor installation and migrations](docs/NOMAN_SQL_EDITOR_COPY_PASTE.md)
 - [Cinematic intro and video upload](docs/2026-11-09-cinematic-hero-production.md)

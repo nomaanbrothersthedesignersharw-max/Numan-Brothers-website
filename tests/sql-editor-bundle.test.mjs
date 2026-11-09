@@ -19,10 +19,12 @@ const migrationNames = [
   '20261109120000_featured_media_guard.sql',
   '20261109190000_media_lifecycle_scale_indexes.sql',
   '20261109194500_client_sku_handoff.sql',
+  '20261109210000_sku_counter_least_privilege.sql',
+  '20261109213000_consolidate_cms_rls_policies.sql',
 ];
 const bundle = readFileSync('supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql','utf8');
 
-test('all sixteen migrations are included byte-for-byte in source order with only transaction wrappers removed',()=>{
+test('all eighteen migrations are included byte-for-byte in source order with only transaction wrappers removed',()=>{
   const positions=[];
   for(let index=0;index<migrationNames.length;index++){
     const source=readFileSync('supabase/migrations/'+migrationNames[index],'utf8');
@@ -45,4 +47,13 @@ test('one transactional install with fresh-project refusal and postflight RLS au
   assert.doesNotMatch(bundle,/^\\(?:set|echo|i)\s/gm);
   assert.doesNotMatch(bundle,/zazdxmukmcayblsteulk/);
   assert.match(bundle,/client-owned Supabase project/);
+});
+
+test('existing-project SQL completion includes both latest security migrations',()=>{
+  const complete = readFileSync('supabase/sql-editor/NOMAN_BROTHERS_COMPLETE_EXISTING_TABLES.sql','utf8');
+  for (const name of migrationNames.slice(-2)) {
+    const source = readFileSync('supabase/migrations/'+name,'utf8');
+    const sql = source.replace(/^begin;\s*$/gmi,'').replace(/^commit;\s*$/gmi,'').trim();
+    assert.ok(complete.includes(sql),'Existing-project completion omits '+name);
+  }
 });

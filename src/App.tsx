@@ -1,7 +1,6 @@
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ArrowRight, ArrowUpRight, MapPin, MessageCircle } from 'lucide-react';
-import { Analytics } from '@vercel/analytics/react';
 import { type PublishedData, HOME_TEMPLATE, loadPublishedData, isSafeHttps } from './lib/cmsData';
 import {siteText} from './lib/siteContent';
 import { loadCataloguePage, loadProductById, type CataloguePage } from './lib/catalogQueries';
@@ -192,6 +191,5 @@ export default function App() {
     </main>
     <V2Footer home={siteData.homepage} categories={siteData.categories} onNavigate={navigate}/>
     <FloatingContactDock home={siteData.homepage} path={path} product={product}/>
-    <Analytics />
   </div>;
 }

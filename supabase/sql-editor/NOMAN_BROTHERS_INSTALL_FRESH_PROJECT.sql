@@ -2028,7 +2028,139 @@ begin
 end;
 $checks$;
 
--- Validate the installation BEFORE committing it. Failure rolls back all 15.
+-- =============================================================================
+-- 17 / 17: 20261109210000_sku_counter_least_privilege.sql
+-- Source: supabase/migrations/20261109210000_sku_counter_least_privilege.sql
+-- =============================================================================
+-- SKU counters are written only through the staff-gated reservation flow.
+-- RLS remains the row-level authorization layer; table ACLs are narrowed so
+-- the public role cannot issue direct counter operations and staff can only
+-- perform the operations required by nb_next_sku() (SELECT/INSERT/UPDATE).
+REVOKE ALL PRIVILEGES ON TABLE public.nb_sku_counters FROM anon;
+REVOKE ALL PRIVILEGES ON TABLE public.nb_sku_counters FROM authenticated;
+GRANT SELECT, INSERT, UPDATE ON TABLE public.nb_sku_counters TO authenticated;
+
+DO $sku_acl_assert$
+BEGIN
+  IF has_table_privilege('anon','public.nb_sku_counters','SELECT')
+    OR has_table_privilege('anon','public.nb_sku_counters','INSERT')
+    OR has_table_privilege('anon','public.nb_sku_counters','UPDATE')
+    OR has_table_privilege('anon','public.nb_sku_counters','DELETE')
+    OR has_table_privilege('anon','public.nb_sku_counters','TRUNCATE')
+    OR has_table_privilege('anon','public.nb_sku_counters','REFERENCES')
+    OR has_table_privilege('anon','public.nb_sku_counters','TRIGGER')
+  THEN
+    RAISE EXCEPTION 'Anonymous SKU counter privileges must be revoked';
+  END IF;
+
+  IF NOT (
+    has_table_privilege('authenticated','public.nb_sku_counters','SELECT')
+    AND has_table_privilege('authenticated','public.nb_sku_counters','INSERT')
+    AND has_table_privilege('authenticated','public.nb_sku_counters','UPDATE')
+  ) OR has_table_privilege('authenticated','public.nb_sku_counters','DELETE')
+    OR has_table_privilege('authenticated','public.nb_sku_counters','TRUNCATE')
+    OR has_table_privilege('authenticated','public.nb_sku_counters','REFERENCES')
+    OR has_table_privilege('authenticated','public.nb_sku_counters','TRIGGER')
+  THEN
+    RAISE EXCEPTION 'Authenticated SKU counter privileges are not least-privilege';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public'
+      AND tablename='nb_sku_counters'
+      AND policyname='nb_sku_counter_staff'
+      AND cmd='ALL'
+      AND roles @> ARRAY['authenticated']::name[]
+  ) THEN
+    RAISE EXCEPTION 'Staff-only SKU counter RLS policy is missing';
+  END IF;
+END
+$sku_acl_assert$;
+
+-- =============================================================================
+-- 18 / 18: 20261109213000_consolidate_cms_rls_policies.sql
+-- Source: supabase/migrations/20261109213000_consolidate_cms_rls_policies.sql
+-- =============================================================================
+-- Preserve the existing OR semantics while avoiding multiple permissive
+-- UPDATE/SELECT policies for the same authenticated role.
+DROP POLICY IF EXISTS nb_media_editor_update_pending ON public.nb_media;
+DROP POLICY IF EXISTS nb_media_publisher_update ON public.nb_media;
+DROP POLICY IF EXISTS nb_media_staff_update ON public.nb_media;
+
+CREATE POLICY nb_media_staff_update ON public.nb_media
+  FOR UPDATE TO authenticated
+  USING (
+    (SELECT public.nb_can_publish())
+    OR (
+      NOT approved
+      AND uploaded_by=(SELECT auth.uid())
+      AND (SELECT public.nb_can_edit())
+    )
+  )
+  WITH CHECK (
+    (SELECT public.nb_can_publish())
+    OR (
+      NOT approved
+      AND uploaded_by=(SELECT auth.uid())
+      AND split_part(storage_path,'/',1)=((SELECT auth.uid())::text)
+      AND (SELECT public.nb_can_edit())
+    )
+  );
+
+DROP POLICY IF EXISTS nb_reviews_public_read ON public.nb_reviews;
+DROP POLICY IF EXISTS nb_reviews_staff_read ON public.nb_reviews;
+DROP POLICY IF EXISTS nb_reviews_authenticated_read ON public.nb_reviews;
+
+-- Keep the public policy free of staff-only function dependencies.
+-- Authenticated users get one policy that grants the union of public-approved
+-- rows and the additional staff-visible rows.
+CREATE POLICY nb_reviews_public_read ON public.nb_reviews
+  FOR SELECT TO anon
+  USING (status='approved');
+
+CREATE POLICY nb_reviews_authenticated_read ON public.nb_reviews
+  FOR SELECT TO authenticated
+  USING (
+    status='approved'
+    OR (SELECT public.nb_can_edit())
+  );
+
+DO $policy_assert$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND tablename='nb_media'
+      AND policyname IN ('nb_media_editor_update_pending','nb_media_publisher_update')
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND tablename='nb_media'
+      AND policyname='nb_media_staff_update' AND cmd='UPDATE'
+  ) THEN
+    RAISE EXCEPTION 'Media update policy consolidation failed';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND tablename='nb_reviews'
+      AND policyname='nb_reviews_staff_read'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND tablename='nb_reviews'
+      AND policyname='nb_reviews_public_read' AND cmd='SELECT'
+      AND roles=ARRAY['anon']::name[]
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND tablename='nb_reviews'
+      AND policyname='nb_reviews_authenticated_read' AND cmd='SELECT'
+      AND roles=ARRAY['authenticated']::name[]
+  ) THEN
+    RAISE EXCEPTION 'Reviews read policy consolidation failed';
+  END IF;
+END
+$policy_assert$;
+
+-- Validate the installation BEFORE committing it. Failure rolls back all 18.
 -- =============================================================================
 DO $nb_install_assert$
 DECLARE

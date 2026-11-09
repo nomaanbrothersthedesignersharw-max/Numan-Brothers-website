@@ -30,7 +30,7 @@ The agency demo Supabase/Vercel deployments are separate, and **must not be poin
 
 **A. Empty project (recommended for a truly clean client installation)**
 
-Open `supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql` in the final client GitHub `main`, click **Raw**, copy the entire SQL text starting with `--` or `BEGIN;` and ending with `COMMIT;`, paste into **that exact project's SQL Editor**, run once. It contains **16 ordered migrations** inside one transaction: 15 `nb_*` application tables, RLS, role functions, category taxonomy, SKU counters, revisions, private staging/public approved media buckets, media lifecycle protection and scalability indexes. It seeds **categories only**, no fake products or client records.
+Open `supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql` in the final client GitHub `main`, click **Raw**, copy the entire SQL text starting with `--` or `BEGIN;` and ending with `COMMIT;`, paste into **that exact project's SQL Editor**, run once. It contains **18 ordered migrations** inside one transaction: 15 `nb_*` application tables, RLS, role functions, category taxonomy, SKU counters, revisions, private staging/public approved media buckets, media lifecycle protection and scalability indexes. It seeds **categories only**, no fake products or client records.
 
 **B. Existing project with all 15 `nb_*` tables**
 
