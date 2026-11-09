@@ -11,6 +11,7 @@
 -- Not a substitute for audit of target data or live role/storage smoke tests.
 -- =============================================================================
 BEGIN;
+SET LOCAL search_path = public, extensions;
 SET LOCAL lock_timeout = '10s';
 SET LOCAL statement_timeout = '120s';
 DO $nb_existing_check$
