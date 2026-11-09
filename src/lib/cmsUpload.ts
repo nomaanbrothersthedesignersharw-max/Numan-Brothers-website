@@ -11,6 +11,26 @@ export const MAX_MEDIA_SIZE = 50 * 1024 * 1024;
 export const TUS_CHUNK_SIZE = 6 * 1024 * 1024;
 const IMMUTABLE_CACHE_SECONDS = '31536000';
 
+export type BatchResult<T> = { ok:true; value:T } | { ok:false; error:unknown };
+/** Run independent uploads with bounded concurrency while preserving input order. */
+export async function runWithConcurrency<T,R>(
+  items:readonly T[],limit:number,worker:(item:T,index:number)=>Promise<R>,
+):Promise<BatchResult<R>[]>{
+  if(!Number.isInteger(limit)||limit<1)throw new Error('Concurrency must be a positive integer');
+  const results:BatchResult<R>[] = new Array(items.length);
+  let cursor=0;
+  const run=async()=>{
+    while(true){
+      const index=cursor++;
+      if(index>=items.length)return;
+      try{results[index]={ok:true,value:await worker(items[index],index)};}
+      catch(error){results[index]={ok:false,error};}
+    }
+  };
+  await Promise.all(Array.from({length:Math.min(limit,items.length)},()=>run()));
+  return results;
+}
+
 export function checkMediaFile(file: Pick<File,'type'|'size'>): string | null {
   if (!allowed.has(file.type)) return 'Use JPG, PNG, WebP, AVIF, GIF, MP4 or WebM. Executable and SVG files are not accepted.';
   if (file.size < 1 || file.size > MAX_MEDIA_SIZE) return 'Files must be smaller than 50 MB. Large photos are compressed in your browser before upload.';
