@@ -15,7 +15,7 @@ export interface CmsProductRow {
   sizes: string[];
   image_urls: string[];
   video_url: string | null;
-  video_urls: string[];
+  video_urls?: string[];
   price: number | null;
   offer_price: number | null;
   customizable: boolean;
