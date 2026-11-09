@@ -35,6 +35,7 @@ A Vercel deployment marked READY proves that an artifact deployed; it does not p
 - Workflow no longer targets the stale second CMS deployment URL.
 - Added Dependabot updates for the Bun lockfile and GitHub Actions, plus CodeQL JavaScript/TypeScript analysis. These workflows become active after the branch is merged; they still need successful runs.
 - Added migration 17 to revoke unnecessary anonymous SKU-counter privileges and remove authenticated DELETE/REFERENCES/TRIGGER/TRUNCATE while retaining the SELECT/INSERT/UPDATE permissions required by the staff-only reservation function. The migration and both SQL bundles are in the PR; it has not been applied to the live database pending schema-history reconciliation and a recovery point.
+- Added migration 18 to consolidate media UPDATE rules and separate public review reads from authenticated staff review reads without widening the original access rules. The fresh-project and existing-project SQL bundles include it; the live policies remain unchanged until the migration ledger and recovery plan are reconciled.
 
 The changes above are branch/project configuration work; they have not been merged to `main` or promoted as a new Production deployment.
 
@@ -52,7 +53,7 @@ The changes above are branch/project configuration work; they have not been merg
 ### Supabase and CMS
 
 - [ ] Review the populated target project owner, billing and recovery configuration. The previous project ref `xiidzpsyuvfhyjudrrfq` is not accessible through the current connection; establish its ownership and confirm whether it contains any data before retiring it.
-- [ ] Compare the live Supabase schema with all 18 source migrations and reconcile the currently empty migration ledger without re-running the fresh installer; only then apply migration 17 and verify direct table privileges and the SKU reservation RPC.
+- [ ] Compare the live Supabase schema with all 18 source migrations and reconcile the currently empty migration ledger without re-running the fresh installer; only then apply migrations 17 and 18 and verify direct table privileges, the SKU reservation RPC and exact anon/authenticated review access.
 - [ ] Deploy and test `nb-media-approval` with a non-production test image and actual owner/admin accounts; test approve, revoke, archive, restore, delete, stale role and referenced asset rejection.
 - [ ] Enable leaked-password protection in Supabase Auth and review the `pg_trgm` public-schema advisor finding.
 - [ ] Review and consolidate the two overlapping permissive policy pairs only after regression tests prove equivalent access for anonymous, editor and publisher roles.
