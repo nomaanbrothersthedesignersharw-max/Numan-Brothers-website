@@ -42,6 +42,12 @@ describe('Catalogue-only release architecture and CMS readiness',()=>{
     expect(productStudio).toContain('Auto-save failed');
     expect(productStudio).toContain('Draft saved automatically');
   });
+  test('product editor flushes the current draft before leaving or starting another product',()=>{
+    expect(productStudio).toContain('const backToList=async()=>');
+    expect(productStudio).toContain('const create=async()=>');
+    expect(productStudio).toContain('await persistDraft(currentId,latestFormRef.current)');
+    expect(productStudio).toContain('onClick={()=>void backToList()}');
+  });
   test('does not reject old approved images when the 300-asset preview cache is incomplete',()=>{
     expect(productStudio).not.toContain('approvedImages.some(');
     expect(productStudio).toContain("client.rpc('nb_publish_product'");
