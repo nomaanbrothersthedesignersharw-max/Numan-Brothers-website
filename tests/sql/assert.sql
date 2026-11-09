@@ -33,14 +33,14 @@ begin
 end;
 $$;
 insert into public.nb_media(storage_path,original_name,mime_type,size_bytes,approved,uploaded_by)
-  values ('11111111-1111-4111-8111-111111111111/a.webp','a.webp','image/webp',1024,false,
+  values ('11111111-1111-4111-8111-111111111111/44444444-4444-4444-8444-444444444444.webp','a.webp','image/webp',1024,false,
     '11111111-1111-4111-8111-111111111111');
 insert into public.nb_home_drafts(key,content,updated_by) values ('home',
  '{"heroTitle":"Crafted for your occasion","heroImage":""}',
  '11111111-1111-4111-8111-111111111111');
 insert into public.nb_product_drafts(product_id,content,updated_by) values
   ('22222222-2222-4222-8222-222222222222',
-  '{"sku":"NB-CI-1","slug":"ci-kids-sherwani","title":"Kids Sherwani","department":"kids","categoryPaths":["/kids/sherwani"],"imageUrls":["https://test.supabase.co/storage/v1/object/public/nb-media-public/11111111-1111-4111-8111-111111111111/a.webp"],"sizes":["M"],"price":"999.00"}',
+  '{"sku":"NB-CI-1","slug":"ci-kids-sherwani","title":"Kids Sherwani","department":"kids","categoryPaths":["/kids/sherwani"],"imageUrls":["https://test.supabase.co/storage/v1/object/public/nb-media-public/11111111-1111-4111-8111-111111111111/44444444-4444-4444-8444-444444444444.webp"],"sizes":["M"],"price":"999.00"}',
   '11111111-1111-4111-8111-111111111111');
 do $$
 declare rejected boolean := false;
@@ -94,7 +94,7 @@ declare blocked boolean := false;
 begin
   update public.nb_product_drafts
     set content = jsonb_set(content, '{imageUrls}',
-      '["https://attacker.example/storage/v1/object/public/nb-media-public/11111111-1111-4111-8111-111111111111/a.webp"]'::jsonb)
+      '["https://attacker.example/storage/v1/object/public/nb-media-public/11111111-1111-4111-8111-111111111111/44444444-4444-4444-8444-444444444444.webp"]'::jsonb)
     where product_id='22222222-2222-4222-8222-222222222222';
   begin
     perform public.nb_publish_product('22222222-2222-4222-8222-222222222222');
@@ -103,7 +103,7 @@ begin
   if not blocked then raise exception 'Unapproved external media URL was accepted'; end if;
   update public.nb_product_drafts
     set content = jsonb_set(content, '{imageUrls}',
-      '["https://test.supabase.co/storage/v1/object/public/nb-media-public/11111111-1111-4111-8111-111111111111/a.webp"]'::jsonb)
+      '["https://test.supabase.co/storage/v1/object/public/nb-media-public/11111111-1111-4111-8111-111111111111/44444444-4444-4444-8444-444444444444.webp"]'::jsonb)
     where product_id='22222222-2222-4222-8222-222222222222';
 end;
 $$;

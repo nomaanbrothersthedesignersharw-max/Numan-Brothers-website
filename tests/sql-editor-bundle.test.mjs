@@ -17,10 +17,11 @@ const migrationNames = [
   '20261108001500_home_media_security.sql',
   '20261109113800_site_reviews.sql',
   '20261109120000_featured_media_guard.sql',
+  '20261109190000_media_lifecycle_scale_indexes.sql',
 ];
 const bundle = readFileSync('supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql','utf8');
 
-test('all fourteen migrations are included byte-for-byte in source order with only transaction wrappers removed',()=>{
+test('all fifteen migrations are included byte-for-byte in source order with only transaction wrappers removed',()=>{
   const positions=[];
   for(let index=0;index<migrationNames.length;index++){
     const source=readFileSync('supabase/migrations/'+migrationNames[index],'utf8');
@@ -41,5 +42,6 @@ test('one transactional install with fresh-project refusal and postflight RLS au
   assert.match(bundle,/has_schema_privilege/);
   assert.match(bundle,/nb-media-staging/);
   assert.doesNotMatch(bundle,/^\\(?:set|echo|i)\s/gm);
-  assert.match(bundle,/zazdxmukmcayblsteulk/);
+  assert.doesNotMatch(bundle,/zazdxmukmcayblsteulk/);
+  assert.match(bundle,/client-owned Supabase project/);
 });

@@ -18,6 +18,9 @@ describe('Server-only media approval contract',()=>{
     assert.match(code,/from\('nb_product_media'\)/);
     assert.match(code,/from\('nb_home_public'\)/);
     assert.match(code,/from\('nb_home_drafts'\)/);
+    assert.match(code,/featuredImages/);
+    assert.match(code,/referencedByHomeDraft/);
+    assert.match(code,/referencedByHome \|\| referencedByHomeDraft/);
     assert.match(code,/from\('nb_product_drafts'\)/);
     assert.match(code,/from\('nb_categories'\)/);
     assert.match(code,/contains\('image_urls'/);

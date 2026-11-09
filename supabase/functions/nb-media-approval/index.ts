@@ -16,6 +16,24 @@ const cors = {
 const json = (status: number, body: Record<string, unknown>) =>
   new Response(JSON.stringify(body), { status, headers: cors })
 
+/**
+ * Website CMS stores hero, editorial, featured-card and per-section media
+ * URLs in the same homepage JSON document. Check *all* of those references
+ * before archive, revoke or deletion — including unsaved published changes
+ * represented by the last persisted draft. SQL triggers enforce this again.
+ */
+function homepageReferences(content: unknown, assetUrl: string): boolean {
+  if (!content || typeof content !== 'object' || Array.isArray(content)) return false;
+  const home = content as Record<string, unknown>;
+  if (['heroImage','menImage','kidsImage','storyImage','customizationImage']
+      .some(key => home[key] === assetUrl)) return true;
+  return ['featuredImages','sectionVideos'].some(key => {
+    const group = home[key];
+    return group && typeof group === 'object' && !Array.isArray(group)
+      && Object.values(group as Record<string, unknown>).some(value => value === assetUrl);
+  });
+}
+
 const handler = withSupabase({ auth: 'user' }, async (req, ctx) => {
   if (req.method !== 'POST') return json(405, { error: 'Method not allowed' })
 
@@ -108,25 +126,12 @@ const handler = withSupabase({ auth: 'user' }, async (req, ctx) => {
       productDraftImages.error || productDraftVideo.error || homeDraft.error) {
     return json(503, { error: 'Cannot verify media references; revocation denied' })
   }
-  const homeContent = homes.data?.content as Record<string, unknown> | undefined
-  const referenceVideos=homeContent?.sectionVideos && typeof homeContent.sectionVideos==='object'
-    && !Array.isArray(homeContent.sectionVideos)
-    ? Object.values(homeContent.sectionVideos):[];
-  const referencedByHome = homeContent &&
-    (['heroImage', 'menImage', 'kidsImage', 'storyImage','customizationImage']
-      .some(key => homeContent[key] === publicUrl) || referenceVideos.some(url=>url===publicUrl))
-  const draftContent=homeDraft.data?.content as Record<string, unknown> | undefined
-  const draftSectionVideos=draftContent?.sectionVideos &&
-    typeof draftContent.sectionVideos==='object' && !Array.isArray(draftContent.sectionVideos)
-    ? Object.values(draftContent.sectionVideos):[];
-  const referencedByHomeDraft=Boolean(draftContent &&
-    (['heroImage','menImage','kidsImage','storyImage','customizationImage']
-      .some(key=>draftContent[key]===publicUrl) ||
-      draftSectionVideos.some(url=>url===publicUrl)));
+  const referencedByHome = homepageReferences(homes.data?.content, publicUrl)
+  const referencedByHomeDraft = homepageReferences(homeDraft.data?.content, publicUrl)
   if ((products.count ?? 0) > 0 || (collections.count ?? 0) > 0 ||
       (legacyImages.count ?? 0) > 0 || (legacyVideo.count ?? 0) > 0 ||
       (productDraftImages.count ?? 0) > 0 || (productDraftVideo.count ?? 0) > 0 ||
-      referencedByHome || ((action==='delete'||action==='archive') && referencedByHomeDraft)) {
+      referencedByHome || referencedByHomeDraft) {
     return json(409, { error: 'This file is still used by a published page or saved draft. Remove it, save and publish the replacement, then retry deletion.' })
   }
 

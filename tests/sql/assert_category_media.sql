@@ -22,7 +22,7 @@ begin
   end if;
 
   update public.nb_categories
-     set image_url='https://test.supabase.co/storage/v1/object/public/nb-media-public/11111111-1111-4111-8111-111111111111/a.webp'
+     set image_url='https://test.supabase.co/storage/v1/object/public/nb-media-public/11111111-1111-4111-8111-111111111111/44444444-4444-4444-8444-444444444444.webp'
      where path='/men/sherwani';
   if (select image_url from public.nb_categories where path='/men/sherwani') is null then
     raise exception 'Approved collection banner was incorrectly rejected';

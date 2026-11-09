@@ -1,7 +1,7 @@
 -- =============================================================================
 -- NOMAN BROTHERS - EXISTING TABLES COMPLETION (NON-DESTRUCTIVE RECONCILIATION)
 -- Target: NEW/OTHER SUPABASE ACCOUNT where all 15 nb_ tables already exist.
--- Generated from the project's 14 reviewed migrations. Preserves table rows.
+-- Generated from the project's 14 base migrations, Phase 2 lifecycle guards and\n-- scalable index additions. Existing table rows are preserved.
 -- Never run original fresh-project installer on these existing tables.
 -- Does not deploy Edge Functions or migrate Auth users / Storage objects.
 -- Review target project in Supabase Dashboard before running.
@@ -2105,6 +2105,20 @@ BEGIN
 END
 $assert$;
 
+
+-- =============================================================================
+-- PRODUCTION SCALE INDEXES (the equivalent of migration 15, without rerunning
+-- Phase 2 guards already included above). Safe for preexisting CMS rows.
+-- =============================================================================
+CREATE INDEX IF NOT EXISTS nb_home_drafts_updated_by_fk_idx ON public.nb_home_drafts(updated_by);
+CREATE INDEX IF NOT EXISTS nb_home_public_published_by_fk_idx ON public.nb_home_public(published_by);
+CREATE INDEX IF NOT EXISTS nb_home_revisions_published_by_fk_idx ON public.nb_home_revisions(published_by);
+CREATE INDEX IF NOT EXISTS nb_import_rows_media_id_fk_idx ON public.nb_import_rows(media_id);
+CREATE INDEX IF NOT EXISTS nb_media_uploaded_by_fk_idx ON public.nb_media(uploaded_by);
+CREATE INDEX IF NOT EXISTS nb_product_drafts_updated_by_fk_idx ON public.nb_product_drafts(updated_by);
+CREATE INDEX IF NOT EXISTS nb_product_revisions_published_by_fk_idx ON public.nb_product_revisions(published_by);
+CREATE INDEX IF NOT EXISTS nb_products_created_by_fk_idx ON public.nb_products(created_by);
+DROP INDEX IF EXISTS public.nb_product_drafts_recent_idx;
 
 COMMIT;
 -- NEXT: deploy nb-media-approval Edge

@@ -58,7 +58,7 @@ jobs:
           fi
       - name: Client onboarding preflight contract tests
         run: node --test tests/client-preflight.test.mjs
-      - name: Verify complete SQL Editor installer matches all fourteen source migrations
+      - name: Verify complete SQL Editor installer matches all fifteen source migrations
         run: node --test tests/sql-editor-bundle.test.mjs
       - name: PostgreSQL CMS role and publishing test
         env:
@@ -70,6 +70,9 @@ jobs:
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/sql/bootstrap.sql
           psql -v ON_ERROR_STOP=1 -f supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql
+          # Validate that an already-installed project can rerun the existing-table
+          # SQL Editor reconciliation without duplicate-schema or policy failures.
+          psql -v ON_ERROR_STOP=1 -f supabase/sql-editor/NOMAN_BROTHERS_COMPLETE_EXISTING_TABLES.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/assert_management.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/assert.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/assert_imports.sql
@@ -77,6 +80,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/sql/assert_category_media.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/verify_supabase_inventory.sql
           psql -v ON_ERROR_STOP=1 -f tests/sql/assert_reviews.sql
+          psql -v ON_ERROR_STOP=1 -f tests/sql/assert_media_lifecycle_scale.sql
       - name: Reject production deployments without client CMS credentials
         run: |
           if env VERCEL_ENV=production VITE_SUPABASE_URL= VITE_SUPABASE_PUBLISHABLE_KEY= VITE_SUPABASE_ANON_KEY= bun run build; then
