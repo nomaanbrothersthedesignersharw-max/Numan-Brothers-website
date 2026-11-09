@@ -4,14 +4,14 @@
 -- Reusable for any NEW, EMPTY, client-owned Supabase project.
 -- No project reference, service key, admin email or password is hardcoded.
 --
--- This single file faithfully concatenates the FIFTEEN reviewed versioned
+-- This single file faithfully concatenates the NINETEEN reviewed versioned
 -- migrations from this repository, in exact order.
 --
 -- READ FIRST:
 -- 1. Use ONLY the brand-new Noman project, never the unrelated "gym" project.
 -- 2. This installer refuses any previously created NB tables/functions/buckets.
 -- 3. Paste the WHOLE file into a new Supabase Dashboard > SQL Editor query.
--- 4. All fifteen migrations run in ONE PostgreSQL transaction. An SQL error
+-- 4. All nineteen migrations run in ONE PostgreSQL transaction. An SQL error
 --    prevents COMMIT; do not manually skip failing statements.
 -- 5. No product or client data are seeded. Only route taxonomy is inserted.
 -- 6. This SQL Editor method does NOT record entries in Supabase CLI migration
@@ -51,7 +51,7 @@ END
 $nb_fresh_project_only$;
 
 -- =============================================================================
--- 1 / 9: 20261107060000_nomaan_cms.sql
+-- 1 / 19: 20261107060000_nomaan_cms.sql
 -- Source: supabase/migrations/20261107060000_nomaan_cms.sql
 -- =============================================================================
 -- Nomaan Brothers CMS: isolated, fail-closed schema. Apply ONLY to a dedicated
@@ -569,7 +569,7 @@ insert into public.nb_categories (path, department, label, sort_order) values
 on conflict (path) do nothing;
 
 -- =============================================================================
--- 2 / 9: 20261107130000_catalogue_private_media.sql
+-- 2 / 19: 20261107130000_catalogue_private_media.sql
 -- Source: supabase/migrations/20261107130000_catalogue_private_media.sql
 -- =============================================================================
 -- Phase 2: catalogue associations, indexed search, private upload staging.
@@ -733,7 +733,7 @@ create index nb_products_published_page_idx on public.nb_products
   (department, updated_at desc, id) where status='published';
 
 -- =============================================================================
--- 3 / 9: 20261107150000_studio_product_index.sql
+-- 3 / 19: 20261107150000_studio_product_index.sql
 -- Source: supabase/migrations/20261107150000_studio_product_index.sql
 -- =============================================================================
 -- Phase 3: stable, server-side searchable catalogue index for the staff CMS.
@@ -763,7 +763,7 @@ revoke all on public.nb_studio_product_index from public,anon,authenticated;
 grant select on public.nb_studio_product_index to authenticated;
 
 -- =============================================================================
--- 4 / 9: 20261107170000_bulk_import_jobs.sql
+-- 4 / 19: 20261107170000_bulk_import_jobs.sql
 -- Source: supabase/migrations/20261107170000_bulk_import_jobs.sql
 -- =============================================================================
 -- Phase 4: resumable audit-friendly catalogue onboarding jobs.
@@ -841,7 +841,7 @@ create policy nb_import_rows_owner_update on public.nb_import_rows for update to
   ));
 
 -- =============================================================================
--- 5 / 9: 20261107172000_match_approved_media.sql
+-- 5 / 19: 20261107172000_match_approved_media.sql
 -- Source: supabase/migrations/20261107172000_match_approved_media.sql
 -- =============================================================================
 -- Server-side SKU matching for approved assets. Never overwrites a manual
@@ -909,7 +909,7 @@ revoke all on function public.nb_link_approved_media(uuid,integer) from public,a
 grant execute on function public.nb_link_approved_media(uuid,integer) to authenticated;
 
 -- =============================================================================
--- 6 / 9: 20261107195000_studio_index_role_gate.sql
+-- 6 / 19: 20261107195000_studio_index_role_gate.sql
 -- Source: supabase/migrations/20261107195000_studio_index_role_gate.sql
 -- =============================================================================
 -- Phase 6: the public product RLS policy alone is not sufficient to
@@ -939,7 +939,7 @@ revoke all on public.nb_studio_product_index from public,anon,authenticated;
 grant select on public.nb_studio_product_index to authenticated;
 
 -- =============================================================================
--- 7 / 9: 20261107199000_import_owner_idempotency.sql
+-- 7 / 19: 20261107199000_import_owner_idempotency.sql
 -- Source: supabase/migrations/20261107199000_import_owner_idempotency.sql
 -- =============================================================================
 -- Phase 6 reconciliation: imported files must be scoped to their uploader.
@@ -953,7 +953,7 @@ create unique index if not exists nb_import_jobs_owner_fingerprint_uq
   on public.nb_import_jobs(created_by, import_key);
 
 -- =============================================================================
--- 8 / 9: 20261107210000_catalogue_integrity_audit.sql
+-- 8 / 19: 20261107210000_catalogue_integrity_audit.sql
 -- Source: supabase/migrations/20261107210000_catalogue_integrity_audit.sql
 -- =============================================================================
 -- Noman Brothers: production-candidate catalogue integrity and audit controls.
@@ -1135,7 +1135,7 @@ revoke all on function public.nb_catalogue_health() from public, anon, authentic
 grant execute on function public.nb_catalogue_health() to authenticated;
 
 -- =============================================================================
--- 9 / 10: 20261107223000_category_media_publish_guard.sql
+-- 9 / 19: 20261107223000_category_media_publish_guard.sql
 -- Source: supabase/migrations/20261107223000_category_media_publish_guard.sql
 -- =============================================================================
 -- Prevent bypassing the approved-media library when changing a public
@@ -1169,7 +1169,7 @@ create trigger nb_category_image_approval_guard
 
 -- =============================================================================
 -- =============================================================================
--- 10 / 12: 20261107234500_cms_archive_and_discard.sql
+-- 10 / 19: 20261107234500_cms_archive_and_discard.sql
 -- Source: supabase/migrations/20261107234500_cms_archive_and_discard.sql
 -- =============================================================================
 -- Forward-only CMS inventory operations: archive products and discard drafts.
@@ -1201,7 +1201,7 @@ for delete to authenticated using (
 
 -- =============================================================================
 -- =============================================================================
--- 11 / 12: 20261107235900_catalogue_media_merchandising.sql
+-- 11 / 19: 20261107235900_catalogue_media_merchandising.sql
 -- Source: supabase/migrations/20261107235900_catalogue_media_merchandising.sql
 -- =============================================================================
 -- Noman Brothers catalog merchandising and media organisation. Forward-only.
@@ -1469,7 +1469,7 @@ where path in ('/men/tope','/kids/tope','/men/marriage/jutti',
                '/men/marriage/sadi','/kids/sadi');
 
 -- =============================================================================
--- 12 / 12: 20261108001500_home_media_security.sql
+-- 12 / 19: 20261108001500_home_media_security.sql
 -- Source: supabase/migrations/20261108001500_home_media_security.sql
 -- =============================================================================
 -- Guard optional website CMS video/background assets during publish and archive.
@@ -1613,7 +1613,7 @@ end;
 $function$;
 
 -- =============================================================================
--- 13 / 13: 20261109113800_site_reviews.sql
+-- 13 / 19: 20261109113800_site_reviews.sql
 -- Source: supabase/migrations/20261109113800_site_reviews.sql
 -- =============================================================================
 -- Only owner-approved, first-party reviews are displayed. No scraped testimonials.
@@ -1670,7 +1670,7 @@ create trigger nb_review_approval_stamp before update on public.nb_reviews
 revoke all on function public.nb_stamp_review_approval() from public,anon,authenticated;
 
 -- =============================================================================
--- 14 / 14: 20261109120000_featured_media_guard.sql
+-- 14 / 19: 20261109120000_featured_media_guard.sql
 -- Source: supabase/migrations/20261109120000_featured_media_guard.sql
 -- =============================================================================
 -- Additional CMS hero/card imagery must belong to an approved public asset.
@@ -1734,7 +1734,7 @@ revoke all on function nb_internal.nb_guard_featured_media_removal() from public
 
 -- =============================================================================
 -- =============================================================================
--- 15 / 15: 20261109190000_media_lifecycle_scale_indexes.sql
+-- 15 / 19: 20261109190000_media_lifecycle_scale_indexes.sql
 -- Source: supabase/migrations/20261109190000_media_lifecycle_scale_indexes.sql
 -- =============================================================================
 -- Noman Brothers: production media lifecycle and indexed staff/media FKs.
@@ -1956,7 +1956,7 @@ CREATE INDEX IF NOT EXISTS nb_products_created_by_fk_idx
 DROP INDEX IF EXISTS public.nb_product_drafts_recent_idx;
 
 -- =============================================================================
--- 16 / 16: 20261109194500_client_sku_handoff.sql
+-- 16 / 19: 20261109194500_client_sku_handoff.sql
 -- Source: supabase/migrations/20261109194500_client_sku_handoff.sql
 -- =============================================================================
 -- Client-handoff compatibility: one authoritative database, category taxonomy,
@@ -2029,7 +2029,7 @@ end;
 $checks$;
 
 -- =============================================================================
--- 17 / 17: 20261109210000_sku_counter_least_privilege.sql
+-- 17 / 19: 20261109210000_sku_counter_least_privilege.sql
 -- Source: supabase/migrations/20261109210000_sku_counter_least_privilege.sql
 -- =============================================================================
 -- SKU counters are written only through the staff-gated reservation flow.
@@ -2079,7 +2079,7 @@ END
 $sku_acl_assert$;
 
 -- =============================================================================
--- 18 / 18: 20261109213000_consolidate_cms_rls_policies.sql
+-- 18 / 19: 20261109213000_consolidate_cms_rls_policies.sql
 -- Source: supabase/migrations/20261109213000_consolidate_cms_rls_policies.sql
 -- =============================================================================
 -- Preserve the existing OR semantics while avoiding multiple permissive
@@ -2431,6 +2431,74 @@ BEGIN
   RETURN NEW;
 END
 $guard$;
+
+-- Final install verification: fail the whole transaction if a required security
+-- boundary, RPC, media bucket or multi-video column is missing.
+DO $nb_install_assert$
+DECLARE
+  missing_tables text[];
+BEGIN
+  SELECT array_agg(required.table_name ORDER BY required.table_name)
+    INTO missing_tables
+  FROM unnest(ARRAY[
+    'nb_categories','nb_products','nb_media','nb_home_drafts',
+    'nb_home_public','nb_home_revisions','nb_product_drafts',
+    'nb_product_revisions','nb_product_media','nb_product_categories',
+    'nb_import_jobs','nb_import_rows','nb_audit_events','nb_sku_counters'
+  ]) AS required(table_name)
+  WHERE to_regclass('public.' || required.table_name) IS NULL;
+
+  IF missing_tables IS NOT NULL THEN
+    RAISE EXCEPTION 'Required CMS tables are missing: %', missing_tables;
+  END IF;
+
+  IF NOT (
+    (SELECT relrowsecurity FROM pg_class WHERE oid='public.nb_products'::regclass)
+    AND (SELECT relrowsecurity FROM pg_class WHERE oid='public.nb_media'::regclass)
+    AND (SELECT relrowsecurity FROM pg_class WHERE oid='public.nb_product_drafts'::regclass)
+    AND (SELECT relrowsecurity FROM pg_class WHERE oid='public.nb_sku_counters'::regclass)
+  ) THEN
+    RAISE EXCEPTION 'Required CMS row-level security is not enabled';
+  END IF;
+
+  IF has_table_privilege('anon','public.nb_product_drafts','SELECT')
+    OR has_table_privilege('anon','public.nb_media','SELECT')
+    OR has_table_privilege('anon','public.nb_sku_counters','SELECT')
+    OR has_table_privilege('anon','public.nb_sku_counters','INSERT')
+    OR has_table_privilege('anon','public.nb_sku_counters','UPDATE')
+    OR has_table_privilege('anon','public.nb_sku_counters','DELETE')
+    OR has_table_privilege('anon','public.nb_sku_counters','TRUNCATE')
+  THEN
+    RAISE EXCEPTION 'Anonymous access to private CMS data or SKU counters is too broad';
+  END IF;
+
+  IF has_schema_privilege('anon','nb_internal','USAGE')
+    OR has_schema_privilege('authenticated','nb_internal','USAGE')
+  THEN
+    RAISE EXCEPTION 'Internal CMS schema must not be directly accessible to API roles';
+  END IF;
+
+  IF NOT has_function_privilege('authenticated','public.nb_publish_product(uuid)','EXECUTE')
+    OR has_function_privilege('anon','public.nb_publish_product(uuid)','EXECUTE')
+  THEN
+    RAISE EXCEPTION 'Product publishing RPC privileges are incorrect';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='nb_products' AND column_name='video_urls'
+  ) THEN
+    RAISE EXCEPTION 'Multi-video product gallery column is missing';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id='nb-media-staging')
+    OR NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id='nb-media-public')
+  THEN
+    RAISE EXCEPTION 'Private staging and public media buckets must both exist';
+  END IF;
+END
+$nb_install_assert$;
+
 COMMIT;
 
 -- SUCCESS (if query completed and transaction COMMITted):
