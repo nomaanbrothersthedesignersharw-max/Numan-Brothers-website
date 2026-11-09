@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ArrowLeft, ArrowRight, Plus, Save, Send, Archive, Trash2 } from 'lucide-react';
 import { type CmsProductRow, isSafeHttps } from '../../lib/cmsData';
@@ -76,6 +76,15 @@ export default function CmsProducts({client,userId,canPublish}:Props){
   const [departmentFilter,setDepartmentFilter]=useState('all');
   const [revisions,setRevisions]=useState<ProductRevision[]>([]);
   const [revisionsLoading,setRevisionsLoading]=useState(false);
+  const [dirty,setDirty]=useState(false);
+  const [saveState,setSaveState]=useState<'idle'|'saving'|'saved'|'failed'>('idle');
+  const [lastSavedAt,setLastSavedAt]=useState<string|null>(null);
+  const latestFormRef=useRef(form);
+  const latestIdRef=useRef(id);
+  const savedSnapshotRef=useRef('');
+  const draftSaveQueue=useRef<Promise<void>>(Promise.resolve());
+  latestFormRef.current=form;
+  latestIdRef.current=id;
   const active=rows.find((r)=>r.id===id);
   const categories=COLLECTION_ROUTES.filter((c)=>!c.isDepartment && !c.isGroup && c.department===form.department);
   // Asset pickers query only when opened; published URLs are verified server-side.
@@ -112,8 +121,53 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     else setRevisions((data||[]) as ProductRevision[]);
     setRevisionsLoading(false);
   };
+  const persistDraft=useCallback(async(productId:string,snapshot:Draft,announce=false):Promise<boolean>=>{
+    const serialized=JSON.stringify(snapshot);
+    const snapshotKey=productId+':'+serialized;
+    if(savedSnapshotRef.current===snapshotKey)return true;
+    setSaveState('saving');
+    const operation=draftSaveQueue.current.then(async()=>{
+      const {error}=await client.from('nb_product_drafts').upsert({
+        product_id:productId,content:snapshot,updated_by:userId,
+      },{onConflict:'product_id'});
+      if(error)throw error;
+      savedSnapshotRef.current=snapshotKey;
+      setRows(current=>{
+        const exists=current.some(item=>item.id===productId);
+        const nextEntry:Entry={id:productId,label:snapshot.title.trim()||'(Untitled draft)',
+          sku:snapshot.sku,live:current.find(item=>item.id===productId)?.live||false,
+          draft:true,form:{...blank}};
+        return exists?current.map(item=>item.id===productId?{...item,...nextEntry}:item):[nextEntry,...current];
+      });
+      if(latestIdRef.current===productId&&JSON.stringify(latestFormRef.current)===serialized){
+        setDirty(false);
+        setSaveState('saved');
+        setLastSavedAt(new Date().toISOString());
+      }
+      if(announce)setMessage('Draft saved privately. This change is not visible to customers.');
+    });
+    draftSaveQueue.current=operation.then(()=>undefined,()=>undefined);
+    try{await operation;return true;}
+    catch(cause){
+      if(latestIdRef.current===productId){
+        setSaveState('failed');
+        setError('Auto-save failed: '+(cause instanceof Error?cause.message:'database error')+'. Your edits remain on screen; retry Save private draft.');
+      }
+      return false;
+    }
+  },[client,userId]);
+
+  // Persist incomplete product drafts as the user types. The database accepts
+  // partial JSON drafts; validation is enforced at publish, not during editing.
+  useEffect(()=>{
+    if(!id||!dirty)return;
+    const productId=id;
+    const snapshot={...form};
+    const timer=setTimeout(()=>{void persistDraft(productId,snapshot);},650);
+    return()=>clearTimeout(timer);
+  },[id,form,dirty,persistDraft]);
   const open=async(entry:Entry)=>{
-    setIsNew(false);setId(entry.id);setPublishedSlug(null);setError(null);setMessage(null);setBusy(true);
+    setIsNew(false);setId(entry.id);setPublishedSlug(null);setError(null);setMessage(null);setBusy(true);setDirty(false);setSaveState('idle');
     setRevisions([]);void loadRevisions(entry.id);
     const [draft,published]=await Promise.all([
       client.from('nb_product_drafts').select('content').eq('product_id',entry.id).maybeSingle(),
@@ -126,17 +180,32 @@ export default function CmsProducts({client,userId,canPublish}:Props){
       setPublishedSlug(published.data?.status==='published'?String(published.data.slug||''):null);
       setForm(draft.data?fromUnknown(draft.data.content):
       published.data?fromPublished(published.data as CmsProductRow):{...blank});
+      setDirty(false);setSaveState(draft.data?'saved':'idle');
     }
     setBusy(false);
   };
-  const update=<K extends keyof Draft>(key:K,value:Draft[K])=>setForm((current)=>({...current,[key]:value}));
-  const create=()=>{setId(crypto.randomUUID());setPublishedSlug(null);setIsNew(true);setForm({...blank});setRevisions([]);setError(null);setMessage(null)};
+  const update=<K extends keyof Draft>(key:K,value:Draft[K])=>{
+    setDirty(true);setSaveState('idle');
+    setForm(current=>({...current,[key]:value}));
+  };
+  const create=()=>{
+    const productId=crypto.randomUUID();
+    const fresh={...blank};
+    setId(productId);setPublishedSlug(null);setIsNew(true);setForm(fresh);
+    setDirty(false);setSaveState('saving');setLastSavedAt(null);
+    setRevisions([]);setError(null);setMessage('New private draft created. Your edits will save automatically.');
+    void persistDraft(productId,fresh).then(saved=>{
+      if(saved&&latestIdRef.current===productId)setSaveState('saved');
+    });
+  };
   const slugify=(value:string)=>value.normalize('NFKD').toLowerCase()
     .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,110);
   const chooseCategory=async(path:string)=>{
     if(!path)return;
+    setDirty(true);setSaveState('idle');
     setForm(current=>({...current,categoryPaths:[path]}));
-    if(!isNew)return;
+    // A draft reopened after navigation/reload may still need its first SKU.
+    if(form.sku)return;
     setSkuLoading(true);setError(null);
     const {data,error}=await client.rpc('nb_next_sku',{p_category_path:path});
     if(error)setError('Could not generate SKU: '+error.message);
@@ -159,11 +228,8 @@ export default function CmsProducts({client,userId,canPublish}:Props){
       if(form.title.trim().length<2||form.sku.trim().length<2||!form.categoryPaths.length)
         throw new Error('Choose a garment type, enter a title and generate a unique SKU before saving.');
       if(!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(form.slug))throw new Error('Use a lowercase hyphenated slug.');
-      const {error}=await client.from('nb_product_drafts').upsert({
-        product_id:id,content:form,updated_by:userId,
-      },{onConflict:'product_id'});
-      if(error)throw error;
-      setMessage('Draft saved privately. This change is not visible to customers.');
+      const saved=await persistDraft(id,form,true);
+      if(!saved)throw new Error('Draft could not be saved. See the auto-save message above.');
       await load();return true;
     }catch(cause){setError(cause instanceof Error?cause.message:'Draft save failed.');return false}
     finally{setBusy(false)}
@@ -260,7 +326,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
             <div className="nb-responsive-grid grid gap-3 sm:grid-cols-2">
               {(['men','kids'] as const).map(dept=><button type="button" key={dept} aria-pressed={form.department===dept}
                 className={(form.department===dept?primaryClass:outlineClass)+' w-full'}
-                onClick={()=>{setForm({...form,department:dept,categoryPaths:[],sku:isNew?'':form.sku,slug:isNew?'':form.slug})}}>
+                onClick={()=>{setDirty(true);setSaveState('idle');setForm({...form,department:dept,categoryPaths:[],sku:isNew?'':form.sku,slug:isNew?'':form.slug})}}>
                 {dept==='men'?"Men’s Wear":"Kids Wear"}</button>)}
             </div>
             <label className="block text-sm font-semibold">Garment category (required)
@@ -274,7 +340,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
           </section>
           <div className="nb-responsive-grid grid gap-5 md:grid-cols-2">
             <Field label="Garment title"><input className={inputClass} value={form.title} onChange={e=>{
-              const title=e.target.value;setForm(cur=>{
+              const title=e.target.value;setDirty(true);setSaveState('idle');setForm(cur=>{
                 const oldAuto=[slugify(cur.title),cur.sku.toLowerCase()].filter(Boolean).join('-');
                 const shouldUpdate=!cur.slug||cur.slug===oldAuto||cur.slug===slugify(cur.title);
                 return {...cur,title,slug:shouldUpdate
@@ -337,6 +403,9 @@ export default function CmsProducts({client,userId,canPublish}:Props){
                 </time>
               </li>)}</ol>}
           </section>
+          <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-600" role="status" aria-live="polite">
+            {saveState==='saving'?'Saving private draft…':saveState==='failed'?'Auto-save failed — use Save private draft to retry.':saveState==='saved'?'Draft saved automatically · '+(lastSavedAt?new Date(lastSavedAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'just now'):'Draft changes save automatically while you work.'}
+          </div>
           <div className="flex flex-wrap gap-3 border-t border-stone-200 pt-6">
             <button type="button" className={outlineClass} disabled={busy} onClick={()=>void save()}><Save size={15}/> Save private draft</button>
             {canPublish&&<button type="button" className={primaryClass} disabled={busy||skuLoading} onClick={()=>void publish()}><Send size={15}/> {publishedSlug?'Update published product':'Publish product'}</button>}
