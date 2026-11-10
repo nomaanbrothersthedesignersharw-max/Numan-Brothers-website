@@ -1,0 +1,53 @@
+name: One-time cleanup of merged historical branches
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-merged-branches:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out complete main history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify merged commits and delete exact obsolete branch refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+
+          while IFS='|' read -r branch expected_head merge_commit; do
+            [[ -n "$branch" ]] || continue
+
+            echo "Verifying $branch"
+            git cat-file -e "${merge_commit}^{commit}"
+            git merge-base --is-ancestor "$merge_commit" origin/main
+
+            encoded_branch="${branch//\//%2F}"
+            current_head="$(gh api "repos/${GITHUB_REPOSITORY}/branches/${encoded_branch}" --jq '.commit.sha')"
+            if [[ "$current_head" != "$expected_head" ]]; then
+              echo "::error::Branch $branch changed since verification; refusing to delete."
+              exit 1
+            fi
+
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" >/dev/null
+            echo "Deleted verified merged branch: $branch"
+          done <<'BRANCHES'
+          audit/fix-csv-and-release-checks-2026-11-09|dd4ef2f7cef75dbd76400db228c6bda45b9ff514|15f1f86d92028ff7d0bf14a2d3cabf7420093eff
+          dependabot/bun/motion-14.10.1|33f498f0504db8249b897594fef35f0f0b6c1f34|9c4a69ed75b4ef307e9a0fabe923e8d2a96bc6a6
+          dependabot/bun/tailwindcss/vite-4.3.5|752558b97a58ebf82a9d30d60d16e6332bb87bce|d2049ea002d7e20dbf00f2a3b0bb134b330b3e2b
+          dependabot/github_actions/actions/checkout-7|77bb901e76213231e28432cddac103803d9612b1|01039fdc001a332197a4f6a020412bdf3b2b9d88
+          dependabot/github_actions/actions/upload-artifact-7|ef0322114dc3256a4b98c628dd4bcb37ad21b207|a9525757e35c125f4aa29e3d5b59e93937f6ee2e
+          feature/cms-media-drafts-optimization|2dedd95350bca044d8a0d6870c743c662f8bf611|ec6913f20b45ce76a190ebbe206700fbac8c22b5
+          vercel/install-vercel-web-analytics-z50gs9|e5da565f2a5200bb31c89e9556aaa9716aea0785|a120177e4419fd40aa6af64402ef369e04af7443
+          BRANCHES
