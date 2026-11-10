@@ -208,3 +208,49 @@ a { text-decoration: none; }
     box-shadow: 0 35px 100px -30px rgba(0,0,0,.85);
   }
 }
+
+/* Cross-component responsive hardening.
+   Grid and flex items otherwise keep their min-content width, which can make
+   long CMS text, filenames, or editor controls force a narrow page sideways. */
+:where(.grid, .flex) > * {
+  min-width: 0;
+}
+
+:where(pre, .overflow-x-auto) {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+}
+
+pre {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+:where(img, video, iframe, canvas, svg) {
+  max-inline-size: 100%;
+}
+
+@media (max-width: 639px) {
+  /* Keep the CMS file picker inside its card on small phones. */
+  .nb-studio input[type="file"] {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .nb-studio input[type="file"]::file-selector-button {
+    min-height: 44px;
+    max-width: 100%;
+    margin-inline-end: .75rem;
+    white-space: normal;
+  }
+
+  /* Keep horizontally scrolling editor tabs and galleries usable on touch. */
+  .nb-studio .overflow-x-auto,
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+}
