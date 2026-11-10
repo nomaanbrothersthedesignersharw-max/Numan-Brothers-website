@@ -13,25 +13,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check out complete main history
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Verify merged commits and delete exact obsolete branch refs
+      - name: Verify merged PR commits and delete exact obsolete branch refs
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main --quiet
 
           while IFS='|' read -r branch expected_head merge_commit; do
             [[ -n "$branch" ]] || continue
 
-            echo "Verifying $branch"
-            git cat-file -e "${merge_commit}^{commit}"
-            git merge-base --is-ancestor "$merge_commit" origin/main
+            echo "Verifying that $merge_commit is already in main"
+            comparison="$(gh api "repos/${GITHUB_REPOSITORY}/compare/${merge_commit}...main" --jq '.status')"
+            if [[ "$comparison" != "ahead" && "$comparison" != "identical" ]]; then
+              echo "::error::Merge commit is not an ancestor of main (comparison=$comparison); refusing to delete $branch."
+              exit 1
+            fi
 
             encoded_branch="${branch//\//%2F}"
             current_head="$(gh api "repos/${GITHUB_REPOSITORY}/branches/${encoded_branch}" --jq '.commit.sha')"
