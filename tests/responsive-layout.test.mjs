@@ -63,3 +63,18 @@ test('Studio offers sticky mobile section navigation and responsive forms',()=>{
     assert.match(src('src/components/studio/'+p+'.tsx'),/nb-responsive-grid|overflow-x-auto/);
   }
 });
+
+
+test('desktop department mega-menu uses a two-column tablet layout before expanding on wide screens', () => {
+  const header = src('src/components/V2Header.tsx');
+  assert.match(header, /grid-cols-2 xl:grid-cols-4/);
+  assert.match(header, /nb-responsive-grid grid gap-5 xl:gap-9/);
+});
+
+test('Studio data tables and control groups stay inside the viewport on phones', () => {
+  const css = src('src/index.css');
+  assert.match(css, /\.nb-studio :where\(table\)[\s\S]*?overflow-x: auto/);
+  assert.match(css, /\.nb-studio :where\(\.grid, \.flex\) > \*[\s\S]*?min-width: 0/);
+  assert.match(css, /\.nb-studio :where\(button, a, \[role="button"\]\)[\s\S]*?min-height: 44px/);
+  assert.match(css, /input\[type="checkbox"\], input\[type="radio"\]/);
+});
