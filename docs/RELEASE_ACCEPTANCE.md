@@ -21,7 +21,7 @@ A Vercel deployment marked READY proves that an artifact deployed; it does not p
 | Supabase | `uinhybkdzevpxnugtvzf`, US East, PostgreSQL 17.11, project ACTIVE_HEALTHY |
 | Schema | 15 public application tables; every public table has RLS enabled; 40 public policies |
 | Storage | Three buckets: private `nb-media`, public approved delivery `nb-media-public`, private staging `nb-media-staging` |
-| Live data at last check | 1 published product, 13 product drafts, 2 media metadata records, 4 Storage objects, 23 categories, 0 reviews |
+| Live data at last check | 0 published products, 0 product drafts, 2 media metadata records, 4 Storage objects, 23 categories, 0 reviews (11 Nov 2026 live count) |
 | Auth | 2 confirmed users; 1 owner role |
 | Edge Function | `nb-media-approval` ACTIVE, version 3, `verify_jwt=true`; deployed source exactly matches repository source |
 | Migration ledger | 21 versions listed for the repository's 21 migration files (details below) |
@@ -62,6 +62,7 @@ A Vercel deployment marked READY proves that an artifact deployed; it does not p
 ## Current release gates
 
 ### Must resolve before commercial launch
+- [ ] Populate and owner-approve the real product catalogue. The live production count is currently 0 published products and 0 product drafts; the sample garment is explicitly demo-only. Upload legitimate product records, sizes, images and any displayed prices before launch.
 - [ ] Connect the Supabase GitHub integration to `uinhybkdzevpxnugtvzf`; confirm the check no longer links to the old project and a new preview run succeeds.
 - [ ] Resolve the Supabase Auth leaked-password warning. Security Advisor reports it disabled. Supabase currently documents leaked-password protection as Pro-plan-and-above; the project is Free, so this needs owner-approved billing or a formal risk acceptance with alternative controls: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
 - [ ] Protect GitHub `main`: require the website quality workflow and CodeQL, prevent force pushes, and restrict bypass.
@@ -111,6 +112,7 @@ A Vercel deployment marked READY proves that an artifact deployed; it does not p
 | Staging scale/load test | PENDING |
 | Lighthouse/accessibility report | PENDING |
 | Security review | CodeQL passed; leaked-password protection still disabled; authenticated OWASP test pending |
+| Published inventory | PENDING — live count is 0 published products / 0 drafts; demo-only sample is not inventory |
 | Owner-approved domain + canonical | PENDING |
 | Business content/legal approval | PENDING |
 | Production deployment | READY on SHA `4bcfa4b...`; 15/15 live public browser checks and live CMS endpoint checks passed. Commercial/legal/domain go-live gates remain NO-GO. |
