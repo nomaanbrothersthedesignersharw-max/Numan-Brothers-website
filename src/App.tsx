@@ -173,7 +173,7 @@ export default function App() {
            {siteData.homepage.contactPhone&&<a href={'tel:+'+siteData.homepage.contactPhone}
              className="mt-6 inline-flex min-h-12 items-center gap-3 border border-[#e2c9a4] px-7 text-xs font-bold uppercase text-[#f8e9d0]">
              {siteText(siteData.homepage,'contact.call')} <ArrowUpRight size={16}/></a>}
-           <div className="mt-10 border-t border-[#786047] pt-6">
+           <div className="mt-10 w-full min-w-0 border-t border-[#786047] pt-6">
              <p className="text-xs font-semibold uppercase tracking-[.2em] text-[#e2bf8f]">Connect with us</p>
              <SocialLinks home={siteData.homepage} variant="dark" showUnconfigured/>
            </div>

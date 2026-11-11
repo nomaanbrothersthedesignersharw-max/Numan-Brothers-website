@@ -14,6 +14,12 @@ describe('Instagram-only footer release contracts',()=>{
     expect(icon).not.toMatch(/<script|<foreignObject|onload=|<image /i);
     const ui=src('src/components/SocialLinks.tsx');
     expect(ui).toContain('src="/social/instagram.svg"');
+    expect(ui).toContain('size-12');
+    expect(ui).toContain('sm:size-14');
+    expect(ui).toContain('h-6 w-6');
+    expect(ui).toContain('sm:h-7 sm:w-7');
+    expect(ui).toContain('flex w-full min-w-0 max-w-full flex-wrap');
+    expect(ui).toContain('data-testid="social-instagram-link"');
     expect(ui).not.toContain('SOCIAL_KEYS.map');
     expect(ui).not.toContain('/social/facebook.svg');
   });
@@ -40,8 +46,10 @@ describe('Instagram-only footer release contracts',()=>{
     expect(social).not.toContain('https://www.instagram.com/nomaanbrothers/');
     const footer=src('src/components/V2Footer.tsx');
     expect(footer).toContain('<SocialLinks home={home} showUnconfigured/>');
+    expect(footer).toContain('mt-7 w-full min-w-0 border-t');
     const contact=src('src/App.tsx');
     expect(contact).toContain('variant="dark" showUnconfigured');
+    expect(contact).toContain('mt-10 w-full min-w-0 border-t');
   });
   test('CMS preserves validated Instagram link without making other accounts visible',()=>{
     const home=cleanHome({socialLinks:{
