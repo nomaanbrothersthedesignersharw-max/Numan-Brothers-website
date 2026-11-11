@@ -78,3 +78,35 @@ test('Studio data tables and control groups stay inside the viewport on phones',
   assert.match(css, /\.nb-studio :where\(button, a, \[role="button"\]\)[\s\S]*?min-height: 44px/);
   assert.match(css, /input\[type="checkbox"\], input\[type="radio"\]/);
 });
+
+
+test('Instagram control scales from phone to desktop and wraps within its parent column', () => {
+  const social = src('src/components/SocialLinks.tsx');
+  assert.match(social, /size-12[^\n]*sm:size-14/);
+  assert.match(social, /h-6 w-6[^\n]*sm:h-7 sm:w-7/);
+  assert.match(social, /flex w-full min-w-0 max-w-full flex-wrap/);
+  assert.match(social, /data-testid="social-instagram-link"/);
+  assert.match(social, /data-testid="social-instagram-pending"/);
+  const footer = src('src/components/V2Footer.tsx');
+  assert.match(footer, /mt-7 w-full min-w-0 border-t/);
+  const app = src('src/App.tsx');
+  assert.match(app, /mt-10 w-full min-w-0 border-t/);
+});
+
+test('responsive browser audit covers every taxonomy route and narrow through ultrawide screens', () => {
+  const smoke = src('scripts/qa-browser-smoke.mjs');
+  for (const route of [
+    '/men','/men/kurta-pyjama','/men/pathani','/men/jodhpuri','/men/tope',
+    '/men/sherwani','/men/sherwani/handwork','/men/sherwani/plain',
+    '/men/suits','/men/suits/handwork','/men/suits/plain','/men/marriage',
+    '/men/marriage/jutti','/men/marriage/pagdi','/men/marriage/sadi',
+    '/kids','/kids/kurta-pyjama','/kids/sherwani','/kids/pathani',
+    '/kids/sadi','/kids/suits','/kids/jodhpuri','/kids/tope',
+    '/contact','/search?q=sherwani','/privacy-policy',
+    '/terms-and-conditions','/returns-and-exchanges'
+  ]) assert.ok(smoke.includes("'" + route + "'"), 'responsive matrix includes ' + route);
+  assert.match(smoke, /\[280,653\][\s\S]*\[2560,1440\]/);
+  assert.match(smoke, /const representative=\[\[280,720\][\s\S]*\[1920,1080\]\]/);
+  assert.match(smoke, /PASS_SOCIAL_RESPONSIVE/);
+  assert.match(smoke, /PASS_SOCIAL_PENDING_RESPONSIVE/);
+});
