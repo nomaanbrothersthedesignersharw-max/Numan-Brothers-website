@@ -8,7 +8,7 @@ This section records verified service state, not a promise that every commercial
 
 | Area | Verified state |
 |---|---|
-| GitHub | `nomaanbrothersthedesignersharw-max/Numan-Brothers-website`; one branch (`main`); 11 merged PRs; no open PRs |
+| GitHub | `nomaanbrothersthedesignersharw-max/Numan-Brothers-website`; one branch (`main`); 11 earlier PRs merged; PR #12 is the open production-readiness hardening PR |
 | Latest source | `4bcfa4b628f1299def1bdf8dfbdb81c9a3a7dfe4` |
 | GitHub Actions | Website quality workflow and CodeQL passed on the latest source; local browser smoke passed 101/101 checks across the responsive matrix and live production smoke passed 15/15 checks |
 | Supabase Preview check | Latest PR check is SKIPPED (no Supabase preview branch is associated); the check details still point at the old project ref `xiidzpsyuvfhyjudrrfq` |
