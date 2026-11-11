@@ -295,6 +295,7 @@ async function inspectConfiguredSocialIcons(){
         [contact,contactInstagram,'contact section'],
       ]){
         await link.scrollIntoViewIfNeeded();
+        await link.locator('img').evaluate(image=>image.decode());
         const geometry=await region.evaluate(nav=>{
           const link=nav.querySelector('[data-testid="social-instagram-link"]');
           const image=link?.querySelector('img');
