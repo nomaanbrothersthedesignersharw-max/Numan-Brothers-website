@@ -26,7 +26,7 @@ const check = (ok, message) => checks.push({ ok, message });
 async function fetchPath(path) {
   const response = await fetch(new URL(path, origin), {
     redirect: 'follow',
-    headers: { accept: 'text/html', 'user-agent': 'NomaanReleaseSmoke/1.0' },
+    headers: { accept: '*/*', 'user-agent': 'NomaanReleaseSmoke/1.0' },
     signal: AbortSignal.timeout(15000),
   });
   check(new URL(response.url).origin === origin, `${path}: stays on expected origin`);
@@ -46,6 +46,32 @@ try {
   check(/<html\b/i.test(studio.body), '/studio: SPA deep-link works');
   const robots = await fetchPath('/robots.txt');
   check(/disallow:\s*\/studio\b/i.test(robots.body), '/robots.txt: disallows studio');
+
+  // The health endpoint uses only the public publishable key and returns
+  // booleans, never credentials or user records. Treat any failed sub-check
+  // as a failed deployment smoke test, even when the endpoint itself is 200.
+  const cms = await fetchPath('/api/cms-status');
+  check(cms.response.headers.get('cache-control')?.toLowerCase().includes('no-store'),
+    '/api/cms-status: no-store');
+  check(cms.response.headers.get('x-robots-tag')?.toLowerCase().includes('noindex'),
+    '/api/cms-status: noindex');
+  let health;
+  try { health = JSON.parse(cms.body); }
+  catch { health = null; }
+  check(!!health && health.configured === true, '/api/cms-status: backend configured');
+  check(health?.auth?.ok === true, '/api/cms-status: Supabase Auth health');
+  check(health?.catalogue?.ok === true, '/api/cms-status: public catalogue access');
+  check(health?.privateAccess?.ok === true, '/api/cms-status: anonymous private-data denial');
+  for (const key of ['categories','products','homepage','draftsPrivate','mediaPrivate','revisionsPrivate']) {
+    check(health?.checks?.[key] === true, `/api/cms-status: ${key}`);
+  }
+  const secretLikeKey = value => {
+    if (!value || typeof value !== 'object') return false;
+    return Object.entries(value).some(([key, item]) =>
+      /secret|password|token|api.?key|email|user.?id/i.test(key) ||
+      secretLikeKey(item));
+  };
+  check(!secretLikeKey(health), '/api/cms-status: no secret or identity fields');
 } catch (error) {
   check(false, `Network/response failure: ${error instanceof Error ? error.message : String(error)}`);
 }
