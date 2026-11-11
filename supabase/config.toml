@@ -1,7 +1,10 @@
-# Noman Brothers catalogue CMS — Supabase CLI local/remote project configuration.
-# This file is safe to commit: it contains no keys or project-specific refs.
-# supabase link --project-ref <NEW_NOMAN_BROTHERS_PROJECT_REF>
-project_id = "uinhybkdzevpxnugtvzf"
+# Noman Brothers catalogue CMS — Supabase CLI local project configuration.
+# Root project_id is a local identifier, not a hosted Supabase project reference.
+# Link a developer CLI checkout separately with:
+# supabase link --project-ref uinhybkdzevpxnugtvzf
+# The GitHub integration target is configured in the selected Supabase project's
+# Project Settings > Integrations; it is not selected by this root field.
+project_id = "numan-brothers-cms"
 
 [functions.nb-media-approval]
 # Only an authenticated user's JWT may reach the privileged approval handler.
