@@ -20,7 +20,7 @@ This section records verified service state, not a promise that every commercial
 | Schema | 15 public application tables, all with RLS enabled; 40 public policies; three media buckets |
 | Migration ledger | 21 repository migration versions now appear in the selected project's migration history |
 | Edge Function | `nb-media-approval` is ACTIVE (version 3) with JWT verification enabled; its deployed source matches GitHub |
-| Live records | 1 published product, 13 product drafts, 2 media metadata records, 4 Storage objects, 23 categories and 0 customer reviews at last count |
+| Live records | 0 published products, 0 product drafts, 2 media metadata records, 4 Storage objects, 23 categories and 0 customer reviews at the 11 Nov 2026 live inventory check |
 | Staff identity | 2 confirmed Auth users; 1 has the owner role |
 | Plans | Vercel Hobby; Supabase Free |
 | Domain / SEO | Only the Vercel-provided production domain is attached. Search indexing remains deliberately blocked until the business-owned canonical domain is confirmed. |
@@ -39,7 +39,8 @@ The GitHub Supabase Preview check is still linked to the old, inaccessible proje
 - No business-owned custom domain is attached. The current `robots.txt` blocks crawling, prerendered pages use `noindex`, and `/sitemap.xml` and `/sitemap-static.xml` return 503 until an approved canonical origin is configured.
 - The deployed media approval function (ACTIVE v3, JWT required) has not yet been exercised end-to-end with real owner/admin accounts. Live `/api/cms-status` checks pass for Auth health, public catalogue reads and anonymous denial of private drafts/media/revisions; these do not replace staff-session lifecycle tests. Test approve, revoke, archive, restore, delete, stale role and referenced-asset rejection before relying on it operationally.
 - Supabase Free does not provide managed database backups and may pause low-activity projects; arrange encrypted off-site database exports and separate Storage-object backups, then prove a restore. Database and Storage backup/restore rehearsal, 10k-product/100k-media staging scale tests, Lighthouse/accessibility testing, and authenticated security testing remain outstanding.
-- Owner-supplied product photography, exact contact/social details, business domain, and approved Privacy, Terms and Returns text must be supplied before public launch.
+- The production database currently has **zero published products and zero product drafts**. Only the clearly marked demo garment is available as a sample; real inventory, product descriptions, sizes, photography and prices must be entered and owner-approved before the catalogue can be commercially launched.
+- Owner-supplied exact contact/social details, business domain, and approved Privacy, Terms and Returns text must be supplied before public launch.
 
 The site is a **read-only browse-and-enquire showroom**, not a payment gateway, stock ledger, POS or ERP. Do not publish invented products, contact details, reviews, legal policies or social URLs.
 
