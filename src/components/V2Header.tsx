@@ -124,7 +124,7 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
                   {siteText(home,'nav.viewAll')} <ArrowRight className="h-4 w-4" />
                 </V2Link>
               </div>
-              <div className={'grid gap-9 ' + (open === 'men' ? 'grid-cols-4' : 'grid-cols-2')}>
+              <div className={'nb-responsive-grid grid gap-5 xl:gap-9 ' + (open === 'men' ? 'grid-cols-2 xl:grid-cols-4' : 'grid-cols-2')}>
                 {getDepartment(open).groups.map(group=>({...group,items:group.items.filter(item=>visible(item.path))})).filter(group=>group.items.length>0).map((group) => (
                   <div key={group.title}>
                     <h3 className="mb-4 border-b border-[#ded1bd] pb-3 font-serif text-lg text-[#24201c]">{group.title}</h3>

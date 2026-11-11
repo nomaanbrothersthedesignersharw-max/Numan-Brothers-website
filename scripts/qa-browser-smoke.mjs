@@ -147,6 +147,22 @@ async function inspect(route,width=390,height=844,opts={}){
         await page.keyboard.press('Escape');
         await page.getByRole('dialog',{name:'Search clothing collections'}).waitFor({state:'hidden',timeout:5000});
       }
+      if(opts.matrix&&route==='/'&&[1024,1180,1280].includes(width)){
+        const departmentToggle=page.locator('header button[aria-controls="department-men"]');
+        await departmentToggle.click();
+        const panel=page.locator('#department-men');
+        await panel.waitFor({state:'visible',timeout:5000});
+        const menuBounds=await panel.evaluate(el=>{
+          const r=el.getBoundingClientRect();
+          return {left:r.left,right:r.right,width:r.width,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};
+        });
+        assert.ok(menuBounds.left>=-2&&menuBounds.right<=width+2,
+          'desktop department menu must stay inside viewport at '+width+'px');
+        assert.ok(menuBounds.scrollWidth<=menuBounds.clientWidth+2,
+          'desktop department menu must not overflow internally at '+width+'px');
+        await page.keyboard.press('Escape');
+        await panel.waitFor({state:'hidden',timeout:5000});
+      }
       if(width<=768 && !opts.reduce){
         await page.getByRole('button',{name:'Open navigation'}).click();
         await page.getByRole('dialog',{name:'Browse collections'}).waitFor({state:'visible',timeout:5000});
