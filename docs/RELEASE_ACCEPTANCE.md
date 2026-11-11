@@ -10,7 +10,7 @@ A Vercel deployment marked READY proves that an artifact deployed; it does not p
 | Area | Audited value |
 |---|---|
 | GitHub | `nomaanbrothersthedesignersharw-max/Numan-Brothers-website`; only `main` branch remains |
-| PRs | 11 merged; 0 open |
+| PRs | 11 earlier PRs merged; PR #12 is the current production-readiness hardening PR |
 | Latest source SHA | `4bcfa4b628f1299def1bdf8dfbdb81c9a3a7dfe4` |
 | GitHub Actions | TypeScript/build and CodeQL passed; local Chromium smoke passed 101/101 checks across 18 viewport widths and 6 representative routes; live production browser smoke passed 15/15 checks |
 | Supabase Preview check | Latest PR check SKIPPED — no Supabase preview branch associated; details URL still points at old project `xiidzpsyuvfhyjudrrfq` |
