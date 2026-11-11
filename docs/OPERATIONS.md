@@ -21,7 +21,7 @@ The earlier Supabase project ref `xiidzpsyuvfhyjudrrfq` is still the target show
 
 ## People and roles
 
-- The business owner controls domain, billing and owner credentials. Give collaborators the minimum access they need; require MFA where available.
+- The business owner controls domain, billing and owner credentials. Give collaborators the minimum access they need; require MFA. Maintain at least two trusted organization owners or an explicit recovery procedure.
 - Staff roles are assigned only through Supabase Auth `app_metadata.nb_role`: `owner`, `admin` or `editor`. User-editable metadata does not grant publishing privileges.
 - Editors prepare drafts. Owner/admin roles approve media and publish content. Do not share staff accounts.
 - For offboarding, revoke sessions, remove the privileged role, review recent revisions/imports and test that a previously issued session no longer grants access.
