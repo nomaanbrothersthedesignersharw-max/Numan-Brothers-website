@@ -267,29 +267,104 @@ async function inspectFloatingContactsAndProduct(){
 
 async function inspectConfiguredSocialIcons(){
   if(live||process.env.NB_MOCK_CMS!=='1')return;
-  for(const width of [320,390,1440]){
+  const widths=[280,320,344,360,375,390,414,430,480,640,768,820,1024,1180,1280,1440,1920,2560];
+  for(const width of widths){
     const context=await browser.newContext({viewport:{width,height:850}});
     const page=await context.newPage();
     page.setDefaultTimeout(8000);
     await mockCmsRoutes(page,{configuredSocial:true});
     try{
       await page.goto(base+'/contact',{waitUntil:'domcontentloaded'});
-      const footer=page.locator('footer').getByRole('navigation',{name:'Nomaan Brothers social media channels'});
+      const footer=page.locator('footer [data-testid="social-profile-icons"]');
+      const contact=page.locator('main [data-testid="social-profile-icons"]');
       await footer.waitFor({state:'attached',timeout:8000});
-      assert.equal(await footer.locator('img').count(),1,'only Instagram icon visible');
-      const instagram=footer.getByRole('link',{name:'Visit Nomaan Brothers on Instagram'});
+      const footerInstagram=footer.getByTestId('social-instagram-link');
+      const contactInstagram=contact.getByTestId('social-instagram-link');
       // The footer renders the empty CMS template before the approved
       // homepage fetch resolves. Wait for hydration instead of racing it.
-      await instagram.waitFor({state:'attached',timeout:7000});
-      assert.equal(await footer.locator('a').count(),1,'only official-domain accounts link');
-      assert.equal(await instagram.getAttribute('href'),'https://www.instagram.com/nomaanbrothers/');
-      assert.equal(await footer.getByRole('img',{name:'Facebook profile not connected yet'}).count(),0);
-      const contact=page.locator('main').getByRole('navigation',{name:'Nomaan Brothers social media channels'});
+      await footerInstagram.waitFor({state:'attached',timeout:7000});
+      await contactInstagram.waitFor({state:'attached',timeout:7000});
+      assert.equal(await footer.locator('img').count(),1,'only Instagram icon visible in the footer');
+      assert.equal(await footer.locator('a').count(),1,'only official-domain account links in the footer');
       assert.equal(await contact.locator('a').count(),1,'contact page shows the same verified profile link');
-      console.log('PASS_SOCIAL_FOOTER',JSON.stringify({width,icons:1,verifiedLinks:1}));
+      assert.equal(await footerInstagram.getAttribute('href'),'https://www.instagram.com/nomaanbrothers/');
+      assert.equal(await contactInstagram.getAttribute('href'),'https://www.instagram.com/nomaanbrothers/');
+      assert.equal(await footer.getByRole('img',{name:'Facebook profile not connected yet'}).count(),0);
+      for(const [region,link,description] of [
+        [footer,footerInstagram,'footer'],
+        [contact,contactInstagram,'contact section'],
+      ]){
+        await link.scrollIntoViewIfNeeded();
+        const geometry=await region.evaluate(nav=>{
+          const link=nav.querySelector('[data-testid="social-instagram-link"]');
+          const image=link?.querySelector('img');
+          const parent=nav.parentElement;
+          const box=el=>{
+            const r=el.getBoundingClientRect();
+            return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};
+          };
+          return {
+            nav:box(nav),link:link?box(link):null,image:image?box(image):null,
+            parent:parent?box(parent):null,
+            documentWidth:document.documentElement.scrollWidth,
+            imageLoaded:!!image&&image.complete&&image.naturalWidth>0,
+            navScrollWidth:nav.scrollWidth,navClientWidth:nav.clientWidth,
+          };
+        });
+        assert.ok(geometry.link,'Instagram link exists in '+description);
+        assert.ok(geometry.link.width>=44&&geometry.link.height>=44,
+          description+' Instagram tap target must be at least 44×44px at '+width+'px');
+        assert.ok(geometry.link.left>=-1&&geometry.link.right<=width+1,
+          description+' Instagram control must stay inside the viewport at '+width+'px');
+        assert.ok(geometry.image&&geometry.image.width>=22&&geometry.image.height>=22,
+          description+' Instagram glyph must scale above 22px at '+width+'px');
+        assert.ok(geometry.image.width<=32&&geometry.image.height<=32,
+          description+' Instagram glyph must stay proportionate at '+width+'px');
+        assert.ok(geometry.image.left>=geometry.link.left&&geometry.image.right<=geometry.link.right,
+          description+' Instagram glyph must stay inside its circular control');
+        assert.ok(geometry.image.top>=geometry.link.top&&geometry.image.bottom<=geometry.link.bottom,
+          description+' Instagram glyph must stay vertically contained');
+        assert.ok(geometry.nav.width<=geometry.parent.width+2,
+          description+' social navigation must fit its content column');
+        assert.ok(geometry.navScrollWidth<=geometry.navClientWidth+2,
+          description+' social navigation must not overflow internally');
+        assert.ok(geometry.documentWidth<=width+2,
+          description+' icon must not create horizontal page scrolling');
+        assert.equal(geometry.imageLoaded,true,'local Instagram SVG must load successfully');
+        assert.equal(await link.getAttribute('target'),'_blank');
+        assert.match(await link.getAttribute('rel')||'',/noopener/);
+      }
+      console.log('PASS_SOCIAL_RESPONSIVE',JSON.stringify({width,regions:2,iconPx:width<640?24:28,tapTargetPx:width<640?48:56}));
     }catch(error){
-      failures.push({route:'social-footer',width,error:String(error?.stack||error)});
-      console.error('FAIL_SOCIAL_FOOTER',width,String(error?.message||error));
+      failures.push({route:'social-responsive',width,error:String(error?.stack||error)});
+      console.error('FAIL_SOCIAL_RESPONSIVE',width,String(error?.message||error));
+    }finally{await context.close();}
+  }
+}
+
+async function inspectUnconfiguredSocialIcons(){
+  if(live||process.env.NB_MOCK_CMS!=='1')return;
+  for(const width of [280,320,390,768,1440]){
+    const context=await browser.newContext({viewport:{width,height:850}});
+    const page=await context.newPage();
+    page.setDefaultTimeout(8000);
+    await mockCmsRoutes(page);
+    try{
+      await page.goto(base+'/contact',{waitUntil:'domcontentloaded'});
+      const footer=page.locator('footer [data-testid="social-profile-icons"]');
+      await footer.waitFor({state:'attached',timeout:8000});
+      const placeholder=footer.getByTestId('social-instagram-pending');
+      await placeholder.waitFor({state:'attached',timeout:7000});
+      const rect=await placeholder.boundingBox();
+      assert.ok(rect&&rect.width>=44&&rect.height>=44,'pending Instagram state keeps a usable touch-sized visual at '+width+'px');
+      assert.ok(rect.x>=-1&&rect.x+rect.width<=width+1,'pending Instagram state remains on-screen at '+width+'px');
+      assert.equal(await footer.locator('a').count(),0,'unconfigured Instagram must not create a dead link');
+      assert.ok((await page.evaluate(()=>document.documentElement.scrollWidth))<=width+2,
+        'pending Instagram state must not widen the document');
+      console.log('PASS_SOCIAL_PENDING_RESPONSIVE',JSON.stringify({width,tapTargetPx:rect.width}));
+    }catch(error){
+      failures.push({route:'social-pending-responsive',width,error:String(error?.stack||error)});
+      console.error('FAIL_SOCIAL_PENDING_RESPONSIVE',width,String(error?.message||error));
     }finally{await context.close();}
   }
 }
@@ -428,9 +503,20 @@ async function inspectViewportMatrix(){
     [1280,800],[1440,900],[1920,1080],[2560,1440]
   ];
   const coreRoutes=['/','/studio'];
-  const otherRoutes=['/men/sherwani','/men/kurta-pyjama','/kids',
-    '/contact','/search?q=sherwani','/products/'+mockProduct.slug];
-  const representative=[[320,720],[390,844],[820,1180],[1440,900],[1920,1080]];
+  // Every route declared in src/storefront/navigation.ts, plus every
+  // non-collection public screen and both real/demo product-detail templates.
+  const otherRoutes=[
+    '/men','/men/kurta-pyjama','/men/pathani','/men/jodhpuri','/men/tope',
+    '/men/sherwani','/men/sherwani/handwork','/men/sherwani/plain',
+    '/men/suits','/men/suits/handwork','/men/suits/plain','/men/marriage',
+    '/men/marriage/jutti','/men/marriage/pagdi','/men/marriage/sadi',
+    '/kids','/kids/kurta-pyjama','/kids/sherwani','/kids/pathani',
+    '/kids/sadi','/kids/suits','/kids/jodhpuri','/kids/tope',
+    '/contact','/search?q=sherwani',
+    '/products/'+mockProduct.slug,'/products/sample-plain-sherwani',
+    '/privacy-policy','/terms-and-conditions','/returns-and-exchanges'
+  ];
+  const representative=[[280,720],[320,720],[390,844],[768,1024],[1024,768],[1440,900],[1920,1080]];
   for(const [width,height] of viewports){
     for(const route of coreRoutes)await inspect(route,width,height,{matrix:true});
   }
@@ -440,9 +526,10 @@ async function inspectViewportMatrix(){
   const planned=viewports.length*coreRoutes.length+representative.length*otherRoutes.length;
   console.log('RESPONSIVE_MATRIX_COMPLETE',JSON.stringify({
     viewports:viewports.length,coreRoutes:coreRoutes.length,
-    representativeBreakpoints:representative.length,otherRoutes:otherRoutes.length,planned
+    responsiveRoutes:otherRoutes.length,representativeBreakpoints:representative.length,planned
   }));
 }
+
 
 try{
   const routes=['/','/men','/kids','/men/sherwani','/men/kurta-pyjama','/men/marriage','/contact','/search?q=sherwani','/studio'];
@@ -457,6 +544,7 @@ try{
   if(!skipped)await inspectEditorialRoutes();
   if(!skipped)await inspectCinematicHeroIntro();
   if(!skipped)await inspectConfiguredSocialIcons();
+  if(!skipped)await inspectUnconfiguredSocialIcons();
 }finally{await browser.close();}
 if(skipped)console.log('LIVE_CHECK_INCOMPLETE: external deployment is not publicly accessible from this runner.');
 console.log('BROWSER_SMOKE_SUMMARY',JSON.stringify({base,live,checks:results.length,failures:failures.length,skipped}));
