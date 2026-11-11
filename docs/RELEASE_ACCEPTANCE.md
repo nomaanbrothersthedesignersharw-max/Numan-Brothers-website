@@ -1,112 +1,115 @@
 # Nomaan Brothers — Release Acceptance and Go/No-Go Ledger
 
-**Release status: NO-GO — NOT YET PRODUCTION-COMMISSIONED.**
+**Release status: NO-GO — deployment is live, but commercial production commissioning is incomplete.**  
+**Last verified:** 11 November 2026.
 
-A Vercel deployment marked READY proves that an artifact deployed; it does not prove that the store is commercially, operationally or security ready. Audit date: 2026-11-09.
+A Vercel deployment marked READY proves that an artifact deployed; it does not prove that the store is commercially, operationally or security ready. This ledger separates verified engineering state from owner decisions and remaining acceptance tests.
 
 ## Current verified topology
 
 | Area | Audited value |
 |---|---|
-| GitHub | `nomaanbrothers.../Numan-Brothers-website` standalone repo; `main` SHA `c8ad7e3d0c197ff7d0bf14a2d3cabf7420093eff` |
-| Vercel | One Vite project, `numan-brothers-website`; production deployment READY |
+| GitHub | `nomaanbrothersthedesignersharw-max/Numan-Brothers-website`; only `main` branch remains |
+| PRs | 10 merged; 0 open |
+| Latest source SHA | `ab927124e8a62975425caa752a898bf11f964e79` |
+| GitHub Actions | TypeScript/build, CodeQL and browser smoke over 18 responsive viewport sizes passed on that SHA |
+| Supabase Preview check | Failing against old project `xiidzpsyuvfhyjudrrfq`; duplicate `nb_categories_public_select` policy; this is not the selected production project |
+| Vercel | One Vite project, `numan-brothers-website`; latest Production deployment READY on the latest source SHA |
 | Public host | `https://numan-brothers-website-nine.vercel.app` |
 | Studio | Same project at `/studio`; no separate CMS project |
-| Vercel runtime | Node 22.x; preview SSO only, production public |
-| Supabase | `uinhybkdzevpxnugtvzf`, US East, PostgreSQL 17.11 |
-| Schema | 15 application tables, all with RLS enabled; 23 categories |
-| Live content | Two confirmed Auth users; one published homepage row and one draft; no products, product drafts, media metadata, Storage objects or reviews |
-| Edge Functions | None deployed; source `nb-media-approval` is present in GitHub |
-| Migration ledger | Supabase migration-history API currently returns no applied migrations; reconcile after a schema diff, never blindly replay the installer |
-| Domain | No custom domain attached; only a Vercel-provided domain is verified |
-| Git protection | `main` currently reports unprotected; branch-protection API access is not available to the connected GitHub integration |
-| CI evidence | No workflow runs were returned in the audit; this release branch must produce a green run before merge |
-| Hosting plan | Vercel Hobby; confirm a commercial-capable plan before commercial production use |
+| Vercel runtime/region | Node 22.x; deployment region IAD1 |
+| Supabase | `uinhybkdzevpxnugtvzf`, US East, PostgreSQL 17.11, project ACTIVE_HEALTHY |
+| Schema | 15 public application tables; every public table has RLS enabled; 40 public policies |
+| Storage | Three buckets: private `nb-media`, public approved delivery `nb-media-public`, private staging `nb-media-staging` |
+| Live data at last check | 1 published product, 13 product drafts, 2 media metadata records, 4 Storage objects, 23 categories, 0 reviews |
+| Auth | 2 confirmed users; 1 owner role |
+| Edge Function | `nb-media-approval` ACTIVE, version 2, `verify_jwt=true`; deployed source exactly matches repository source |
+| Migration ledger | 21 versions listed for the repository's 21 migration files (details below) |
+| Domain/SEO | Only Vercel-provided domain attached; no business-owned custom domain or canonical origin |
+| Git protection | `main` reports unprotected; automatic delete of merged head branches is enabled |
+| Plans | Vercel Hobby; Supabase Free |
 
-## Work completed during this audit
+## Verified work completed
 
-- Production Supabase URL was verified to target the accessible `uinhybkdzevpxnugtvzf` project. Its Vercel publishable key was checked against the matching active Supabase publishable key; no key value is recorded here.
-- Vercel preview protection was narrowed to Preview only so that Production is not SSO-gated for customers.
-- Vercel Node version aligned to Node 22.x, matching the documented CI/runtime baseline.
-- An isolated Git branch was created for source fixes.
-- CSV parsing was hardened for BOM, LF/CRLF/CR, malformed characters after a closing quote and record limits.
-- CSV error export now neutralizes actual control-character prefixes before spreadsheet formula markers.
-- Live smoke test now targets the actual single deployed site and permits the safe showroom contact fallback instead of requiring unconfigured phone data.
-- Workflow no longer targets the stale second CMS deployment URL.
-- Added Dependabot updates for the Bun lockfile and GitHub Actions, plus CodeQL JavaScript/TypeScript analysis. These workflows become active after the branch is merged; they still need successful runs.
-- Added migration 17 to revoke unnecessary anonymous SKU-counter privileges and remove authenticated DELETE/REFERENCES/TRIGGER/TRUNCATE while retaining the SELECT/INSERT/UPDATE permissions required by the staff-only reservation function. The migration and both SQL bundles are in the PR; it has not been applied to the live database pending schema-history reconciliation and a recovery point.
-- Added migration 18 to consolidate media UPDATE rules and separate public review reads from authenticated staff review reads without widening the original access rules. The fresh-project and existing-project SQL bundles include it; the live policies remain unchanged until the migration ledger and recovery plan are reconciled.
+### Repository and delivery
+- GitHub has one permanent branch, `main`; all 10 pull requests are merged and none are open.
+- The latest source SHA above passed TypeScript/build, CodeQL and the 18-viewport browser smoke job.
+- Vercel's latest Production deployment is READY and points to that exact SHA.
+- The live homepage, `/studio`, `/men` and `/kids` respond successfully. No Vercel runtime error clusters were reported in the selected seven-day query.
+- Vercel production env's deployed JavaScript bundle was checked to contain the selected `uinhybkdzevpxnugtvzf` URL and its matching publishable key. No secret key was observed in the browser bundle.
 
-The changes above are branch/project configuration work; they have not been merged to `main` or promoted as a new Production deployment.
+### Supabase schema and migration history
+- Read-only inventory passed: 15 expected public tables, all with RLS; 40 public policies; 3 configured Storage buckets; secure staff index view; required CMS RPCs; and private internal schema checks.
+- Expected CMS functions and triggers are present. The one old Studio index name absent from the database is replaced by `nb_product_drafts_changed_idx` on the same columns.
+- The five existing migration-history rows were compared with their matching source SQL and statements matched exactly, despite timestamp differences in the old history.
+- The migration history now lists all 21 source migration versions. Sixteen older migrations were added as history-only records after their installed schema objects were checked. The five SQL-backed records were aligned to their source filenames.
+- **No migration SQL was replayed and no fresh-project installer was run against production.** This was migration-history metadata reconciliation, not a database reset or schema replay.
+- The `pg_trgm` extension is in the `extensions` schema. Required video-gallery indexes and the secure staff view are present.
+- Public review column grants were inspected: anonymous users can submit the intended fields and read approved-review fields; they cannot update moderation status. RLS controls which rows are visible.
+- `nb-media-approval` is live with JWT verification and its deployed source matches GitHub. Its approve/revoke/archive/restore/delete flows still require authenticated owner/admin end-to-end tests.
 
-## Required release gates
+### Remaining failed integration check
+- The GitHub `Supabase Preview` check links to `xiidzpsyuvfhyjudrrfq`, not the selected `uinhybkdzevpxnugtvzf` project.
+- It fails with SQLSTATE 42710 because `nb_categories_public_select` already exists on the old project's preview database.
+- The current connected Supabase account cannot inspect or administer that old project. Do not attempt to repair or modify it blindly.
+- Reconnect Supabase GitHub integration from the selected project's **Project Settings → Integrations**, choose this repository and set working directory to `.`. Confirm the new check links to `uinhybkdzevpxnugtvzf`. Supabase's GitHub integration guide: https://supabase.com/docs/guides/deployment/branching/github-integration.
+- Supabase organization Free plan currently has no active development branches. Automatic preview branches may require a paid plan; production connection and branch preview are separate settings.
 
-### Code and CI
+## Current release gates
 
-- [ ] Pull request reviewed and merged only after all quality workflow jobs pass on the exact proposed SHA.
-- [ ] TypeScript, Bun tests, PostgreSQL role/RLS tests, SQL installer consistency and Chromium viewport matrix pass.
-- [ ] Live public smoke test passes against the actual Production domain after deployment.
-- [ ] GitHub branch protection is enabled on `main`; require the quality workflow and prevent force-push/bypass.
-- [ ] Enable dependency security alerts and a secret-scanning/push-protection policy; review existing repository history for accidentally committed credentials.
-- [ ] Confirm source contains no service-role key, database password or private API credential.
+### Must resolve before commercial launch
+- [ ] Connect the Supabase GitHub integration to `uinhybkdzevpxnugtvzf`; confirm the check no longer links to the old project and a new preview run succeeds.
+- [ ] Enable leaked-password protection in Supabase Auth. Security Advisor currently reports it disabled: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
+- [ ] Protect GitHub `main`: require the website quality workflow and CodeQL, prevent force pushes, and restrict bypass.
+- [ ] Confirm a Vercel plan permitted for commercial use. Current organization plan is Hobby; do not assume it is appropriate for a business storefront.
+- [ ] Confirm the Supabase plan is appropriate for required backup retention, uptime and expected traffic. Current organization plan is Free.
+- [ ] Attach and verify the business-owned custom domain. Add `SITE_CANONICAL_URL` to Vercel Production only after that exact HTTPS origin is approved.
+- [ ] Then verify prerendered pages no longer contain `noindex`, `robots.txt` allows approved public routes while disallowing `/studio` and `/api/`, and `/sitemap.xml`, `/sitemap-static.xml` and product sitemap pages return valid XML. Until a canonical domain is approved, the current crawl block and sitemap 503 responses are intentional.
+- [ ] Approve real product photography, descriptions, sizes, prices (if displayed), usage rights, contact details, official social URL, business address and legal Privacy/Terms/Returns text. Never invent these.
 
-### Supabase and CMS
-
-- [ ] Review the populated target project owner, billing and recovery configuration. The previous project ref `xiidzpsyuvfhyjudrrfq` is not accessible through the current connection; establish its ownership and confirm whether it contains any data before retiring it.
-- [ ] Compare the live Supabase schema with all 18 source migrations and reconcile the currently empty migration ledger without re-running the fresh installer; only then apply migrations 17 and 18 and verify direct table privileges, the SKU reservation RPC and exact anon/authenticated review access.
-- [ ] Deploy and test `nb-media-approval` with a non-production test image and actual owner/admin accounts; test approve, revoke, archive, restore, delete, stale role and referenced asset rejection.
-- [ ] Enable leaked-password protection in Supabase Auth and review the `pg_trgm` public-schema advisor finding.
-- [ ] Review and consolidate the two overlapping permissive policy pairs only after regression tests prove equivalent access for anonymous, editor and publisher roles.
-- [ ] Confirm database backup cadence, restore a backup to a separate project, and independently restore Storage objects.
+### Supabase and CMS acceptance
+- [ ] Run authenticated owner/admin tests for Studio login, session expiry, role removal and role revocation.
+- [ ] Run a supervised media lifecycle test using a non-production asset: upload, approve, attach, reject revocation while referenced, detach, revoke, archive, restore and delete. Verify rejection for stale/non-owner roles and referenced assets.
+- [ ] Verify actual public and authenticated RLS/Storage behavior using owner, editor, anonymous and authenticated test sessions; static policy inspection alone is not sufficient.
+- [ ] Confirm database backup cadence and perform a restore to a separate project; independently restore Storage objects.
 - [ ] Run the 5-product workflow: create SKU, upload, approve, attach, draft, publish, edit, archive, restore and publish homepage.
-- [ ] Verify no fake demo content is included in the live catalogue. The sample Plain Sherwani stays `DEMO / NOT FOR SALE`.
-
-### Business content and storefront
-
-- [ ] Attach and verify the business-owned custom domain and canonical URL.
-- [ ] Add `SITE_CANONICAL_URL` to Vercel Production using the exact verified HTTPS origin for the business-owned custom domain; verify prerendered pages no longer contain `noindex`, `robots.txt` allows public routes (while disallowing `/studio` and `/api/`), and `/sitemap.xml`, `/sitemap-static.xml` and product sitemap pages return valid XML.
-- [ ] Validate HTTPS, redirects, DNS, sitemap, robots, canonical tags and structured data on the verified domain.
-- [ ] Confirm real product photography, descriptions, sizes, prices (where displayed) and image rights.
-- [ ] Confirm owner-approved contact numbers, social URLs and business address; never invent these.
-- [ ] Approve real Privacy, Terms and Returns policy text before publishing.
-- [ ] Test Studio login, session expiry, role removal and owner/admin privileges on the actual project.
+- [ ] Test CSV import/retry and saved product drafts with a small approved test dataset.
+- [ ] Confirm no demo content is presented as a real product. The sample Plain Sherwani stays clearly marked `DEMO / NOT FOR SALE`.
 
 ### Performance, security and resilience
-
-- [ ] Run k6 on staging through gradual 50/100/250/500/1,000 virtual-user stages, followed by stress and soak tests. Record request p50/p95/p99, error rate, DB load and recovery behavior.
-- [ ] Test 10,000 synthetic products and 100,000 synthetic media metadata rows in staging; record measured query times, API performance and costs.
+- [ ] Test 10,000 synthetic products and 100,000 synthetic media metadata rows in staging. Record actual query timings, API response times, upload throughput and cost.
+- [ ] Run k6 on staging through gradual 50/100/250/500/1,000 virtual-user stages, followed by stress and soak testing. Record p50/p95/p99, error rate, database load and recovery.
 - [ ] Run Lighthouse CI on storefront, category, product, contact and Studio login routes. Record Core Web Vitals and accessibility findings.
-- [ ] Run CodeQL/dependency/secret scans and an authenticated/unauthenticated OWASP ZAP scan on staging.
-- [ ] Configure uptime/error alerts, and rehearse rollback and database/media restoration.
-- [ ] Reassess Vercel and Supabase region placement based on measured Hyderabad/India traffic latency. Current functions use IAD1 and Supabase is US East.
+- [ ] Run authenticated/unauthenticated OWASP ZAP testing and dependency/secret scanning on staging.
+- [ ] Configure uptime/error alerts and rehearse application rollback plus database and media recovery.
+- [ ] Reassess IAD1/Virginia hosting and US East database placement against measured India/Hyderabad traffic latency.
+- [ ] Review Supabase's 23 unused-index INFO findings after representative traffic/load tests. Do not drop indexes merely because the new low-volume project has not used them yet.
 
-### Ownership and commercial readiness
-
-- [ ] Move hosting to a Vercel plan permitted for commercial use or choose another commercial host.
-- [ ] Confirm the client owns or administers GitHub, Supabase, Vercel and domain registrar accounts.
-- [ ] Complete MFA, access review and a named incident-response owner.
-- [ ] Record the exact release SHA, green CI URL, Supabase migration evidence, restore evidence, load-test report, custom domain, rollback target, owner signoff and date.
-- [ ] Only after every required gate is evidenced, authorize Production promotion.
+### Ownership and release sign-off
+- [ ] Confirm the business owner administers GitHub, Supabase, Vercel and the domain registrar.
+- [ ] Complete MFA, account-access review and name an incident-response owner.
+- [ ] Record exact release SHA, successful GitHub Actions links, correct Supabase Preview check, migration-history evidence, backup/restore evidence, load-test report, Lighthouse/security reports, custom domain, rollback target and owner sign-off.
+- [ ] Only after required gates are evidenced, authorize the commercial launch and search indexing.
 
 ## Release evidence ledger
 
-Fill this ledger with evidence from the exact release commit. Do not guess or backfill pass statuses.
-
-| Item | Evidence |
+| Item | Evidence / current state |
 |---|---|
-| Release SHA | PENDING |
-| GitHub Actions URL (same SHA) | PENDING |
-| Protected `main` verification | PENDING |
-| Supabase schema diff/migration reconciliation | PENDING |
-| Edge Function deploy + auth tests | PENDING |
-| RLS/Storage role tests | PENDING |
+| Current source SHA | `ab927124e8a62975425caa752a898bf11f964e79` |
+| GitHub quality workflow | https://github.com/nomaanbrothersthedesignersharw-max/Numan-Brothers-website/actions/runs/42969471277 — success |
+| GitHub CodeQL | https://github.com/nomaanbrothersthedesignersharw-max/Numan-Brothers-website/actions/runs/42969471359 — success |
+| Supabase Preview | FAIL — still linked to old project `xiidzpsyuvfhyjudrrfq` |
+| Protected `main` verification | PENDING — main currently unprotected |
+| Supabase schema and migration ledger | 21 versions listed; schema inventory passed; 16 history-only records |
+| Edge Function | ACTIVE v2, JWT verified, source matches; live role/lifecycle tests pending |
+| RLS and Storage role tests | Inventory and privilege inspection passed; full live session matrix pending |
 | Database + Storage restore drill | PENDING |
-| Staging load-test report | PENDING |
+| Staging scale/load test | PENDING |
 | Lighthouse/accessibility report | PENDING |
-| Security scan report | PENDING |
+| Security review | CodeQL passed; leaked-password protection still disabled; authenticated OWASP test pending |
 | Owner-approved domain + canonical | PENDING |
-| Business content/policy approval | PENDING |
-| Production deployment + live smoke test | PENDING |
-| Business owner signoff | PENDING |
+| Business content/legal approval | PENDING |
+| Production deployment | READY on the current source SHA; live domain/indexing acceptance pending |
+| Business owner sign-off | PENDING |
 
-**Never label the site production-ready solely because Vercel says READY or source compilation succeeds.**
+**Never label the site fully production-ready solely because Vercel says READY or source compilation succeeds.**
