@@ -13,7 +13,7 @@ A Vercel deployment marked READY proves that an artifact deployed; it does not p
 | PRs | 11 merged; 0 open |
 | Latest source SHA | `4bcfa4b628f1299def1bdf8dfbdb81c9a3a7dfe4` |
 | GitHub Actions | TypeScript/build and CodeQL passed; local Chromium smoke passed 101/101 checks across 18 viewport widths and 6 representative routes; live production browser smoke passed 15/15 checks |
-| Supabase Preview check | Failing against old project `xiidzpsyuvfhyjudrrfq`; duplicate `nb_categories_public_select` policy; this is not the selected production project |
+| Supabase Preview check | Latest PR check SKIPPED — no Supabase preview branch associated; details URL still points at old project `xiidzpsyuvfhyjudrrfq` |
 | Vercel | One Vite project, `numan-brothers-website`; latest Production deployment READY on the latest source SHA |
 | Public host | `https://numan-brothers-website-nine.vercel.app` |
 | Studio | Same project at `/studio`; no separate CMS project |
@@ -52,9 +52,9 @@ A Vercel deployment marked READY proves that an artifact deployed; it does not p
 - Public review column grants were inspected: anonymous users can submit the intended fields and read approved-review fields; they cannot update moderation status. RLS controls which rows are visible.
 - `nb-media-approval` is live with JWT verification and its deployed source matches GitHub. Its approve/revoke/archive/restore/delete flows still require authenticated owner/admin end-to-end tests.
 
-### Remaining failed integration check
-- The GitHub `Supabase Preview` check links to `xiidzpsyuvfhyjudrrfq`, not the selected `uinhybkdzevpxnugtvzf` project.
-- It fails with SQLSTATE 42710 because `nb_categories_public_select` already exists on the old project's preview database.
+### Remaining Supabase Preview integration gap
+- The latest GitHub `Supabase Preview` check for PR #12 was skipped because no Supabase branch is associated with that PR. Its details URL still points to `xiidzpsyuvfhyjudrrfq`, not the selected `uinhybkdzevpxnugtvzf` production project.
+- An earlier run against the old integration returned SQLSTATE 42710 because `nb_categories_public_select` already existed on that old project's preview database. The latest skipped result is not a successful database preview.
 - The current connected Supabase account cannot inspect or administer that old project. Do not attempt to repair or modify it blindly.
 - Reconnect Supabase GitHub integration from the selected project's **Project Settings → Integrations**, choose this repository and set working directory to `.`. Confirm the new check links to `uinhybkdzevpxnugtvzf`. Supabase's GitHub integration guide: https://supabase.com/docs/guides/deployment/branching/github-integration.
 - Supabase organization Free plan currently has no active development branches. Automatic preview branches may require a paid plan; production connection and branch preview are separate settings.
