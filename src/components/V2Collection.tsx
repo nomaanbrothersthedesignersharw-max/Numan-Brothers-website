@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowRight, ArrowUpRight, MapPin } from 'lucide-react';
 import { CatalogProduct, productImage, productPath, productsForCollection } from '../storefront/catalog';
 import { CollectionRoute, getDepartment, getRelatedCollectionLinks } from '../storefront/navigation';
@@ -9,20 +9,35 @@ import ShareCatalogue from './ShareCatalogue';
 import type { CmsHome,CmsCategoryRow } from '../lib/cmsData';
 import {siteText} from '../lib/siteContent';
 
-interface Props { route: CollectionRoute; products: CatalogProduct[]; bannerImage?:string; totalCount?:number;
+interface Props { route: CollectionRoute; products: CatalogProduct[]; bannerImage?:string; hasMore?:boolean; error?:string|null; onRetry?:()=>void;
   page?:number;pageSize?:number;onPageChange?:(page:number)=>void;
   onNavigate: (path: string) => void;home?:CmsHome;categories?:CmsCategoryRow[]; }
+
+function ProductCardImage({ product }: { product: CatalogProduct }) {
+  const src = productImage(product);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(!src);
+  useEffect(() => {
+    setLoaded(false);
+    setFailed(!src);
+  }, [src]);
+
+  return <div className="relative aspect-[3/4] overflow-hidden bg-[#e9e0d2]">
+    {src && !failed ? <img src={src} alt={product.title} loading="lazy" decoding="async"
+      onLoad={() => setLoaded(true)} onError={() => { setFailed(true); setLoaded(false); }}
+      className={'h-full w-full object-cover object-top transition-[opacity,transform] duration-700 group-hover:scale-[1.06] ' + (loaded ? 'opacity-100' : 'opacity-0')}/> : null}
+    {!loaded && !failed && <div className="nb-skeleton absolute inset-0" aria-hidden="true"/>}
+    {failed && <div className="absolute inset-0 flex items-center justify-center font-serif text-3xl italic text-[#9a8668]">Nomaan</div>}
+    <span className="absolute bottom-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-[#f8f3e9]/95 text-[#352b20] opacity-0 transition-all duration-300 group-hover:opacity-100 group-focus-visible:opacity-100"><ArrowUpRight size={19}/></span>
+  </div>;
+}
+
 export function V2ProductGrid({ products, onNavigate,home }: { products: CatalogProduct[]; onNavigate: (path: string) => void;home?:CmsHome }) {
   return <div className="nb-responsive-grid grid grid-cols-1 gap-x-4 gap-y-9 min-[360px]:grid-cols-2 md:grid-cols-3 md:gap-x-6 md:gap-y-12 lg:grid-cols-4">
     {products.map((product, index) => (
       <V2Reveal key={product.id} delay={Math.min(index % 4, 3) * 0.04}>
         <V2Link href={productPath(product)} onNavigate={onNavigate} className="group block">
-          <div className="relative aspect-[3/4] overflow-hidden bg-[#e9e0d2]">
-            {productImage(product) ? <img src={productImage(product)} alt={product.title} loading="lazy" decoding="async"
-              className="h-full w-full object-cover object-top transition-transform duration-700 group-hover:scale-[1.06]" /> :
-              <div className="flex h-full items-center justify-center font-serif text-3xl italic text-[#9a8668]">Nomaan</div>}
-            <span className="absolute bottom-4 right-4 flex h-10 w-10 items-center justify-center rounded-full bg-[#f8f3e9]/95 text-[#352b20] opacity-0 transition-all duration-300 group-hover:opacity-100 group-focus-visible:opacity-100"><ArrowUpRight size={19}/></span>
-          </div>
+          <ProductCardImage product={product}/>
           <p className="mt-4 text-[9px] font-semibold uppercase tracking-[.18em] text-[#a17e4f]">{siteText(home,'footer.brand')}</p>
           <h3 className="mt-1.5 break-words font-serif text-base leading-snug text-[#2d271f] md:text-xl">{product.title}</h3>
           {product.fabric && <p className="mt-1.5 text-xs leading-5 text-[#807366]">{product.fabric}</p>}
@@ -39,7 +54,7 @@ export function V2ProductGrid({ products, onNavigate,home }: { products: Catalog
   </div>;
 }
 
-export default function V2Collection({ route, products, bannerImage, totalCount, page = 0, pageSize = 24, onPageChange,home,categories=[],onNavigate }: Props) {
+export default function V2Collection({ route, products, bannerImage, hasMore = false, error = null, onRetry, page = 0, pageSize = 24, onPageChange,home,categories=[],onNavigate }: Props) {
   const department = getDepartment(route.department);
   const links = getRelatedCollectionLinks(route.path)
     .filter(item=>item.path!==route.path && (categories.length===0||categories.some(c=>c.path===item.path)))
@@ -86,7 +101,7 @@ export default function V2Collection({ route, products, bannerImage, totalCount,
       )}
       <div className="mb-9 flex flex-wrap items-end justify-between gap-5 border-b border-[#e2d7c8] pb-5">
         <h2 className="font-serif text-[31px] tracking-[-.035em] text-[#2a241e] md:text-4xl">{siteText(home,'collection.heading')}</h2>
-        <p className="text-xs text-[#84766a]">{totalCount ?? matches.length} {(totalCount ?? matches.length) === 1 ? 'style' : 'styles'}</p>
+        <p className="text-xs text-[#84766a]">Showing {matches.length} {matches.length === 1 ? 'style' : 'styles'}{hasMore ? ' · more available' : ''}</p>
       </div>
       {route.path==='/men/sherwani/plain'&&<aside className="mb-9 rounded-xl border border-[#bea178] bg-[#f5ead9] p-5">
          <p className="text-[10px] font-bold uppercase tracking-[.18em] text-[#8f6637]">Interactive preview · Not inventory</p>
@@ -97,7 +112,10 @@ export default function V2Collection({ route, products, bannerImage, totalCount,
            Open demo garment <ArrowUpRight size={17}/>
          </V2Link>
        </aside>}
-       {matches.length ? <V2ProductGrid products={matches} home={home} onNavigate={onNavigate}/> :
+       {error ? <div className="border border-amber-200 bg-amber-50 px-6 py-8 text-center text-sm text-amber-900" role="status">
+          The collection could not be loaded. Check your connection and try again.
+          {onRetry && <button type="button" onClick={onRetry} className="ml-2 min-h-11 underline underline-offset-4">Try again</button>}
+        </div> : matches.length ? <V2ProductGrid products={matches} home={home} onNavigate={onNavigate}/> :
         <V2Reveal className="relative overflow-hidden border border-[#dfd3c2] bg-[#f4ecdf] px-7 py-16 text-center md:py-24">
           <p className="mb-4 text-[10px] font-semibold uppercase tracking-[.22em] text-[#9b784e]">{siteText(home,'collection.emptyEyebrow')}</p>
           <h3 className="font-serif text-3xl text-[#29221c] md:text-5xl">{siteText(home,'collection.emptyTitle')}</h3>
@@ -107,12 +125,12 @@ export default function V2Collection({ route, products, bannerImage, totalCount,
           </V2Link>
         </V2Reveal>
       }
-      {onPageChange && (totalCount||0)>pageSize && <nav aria-label="Collection pages" className="mt-12 flex flex-wrap items-center justify-center gap-3">
+      {onPageChange && (hasMore || page>0) && <nav aria-label="Collection pages" className="mt-12 flex flex-wrap items-center justify-center gap-3">
         <button type="button" className="min-h-11 border border-[#b9a991] px-5 disabled:opacity-40"
           disabled={page===0} onClick={()=>onPageChange(Math.max(0,page-1))}>Previous</button>
-        <span className="self-center text-sm">Page {page+1} of {Math.ceil((totalCount||0)/pageSize)}</span>
+        <span className="self-center text-sm">Page {page+1}</span>
         <button type="button" className="min-h-11 border border-[#b9a991] px-5 disabled:opacity-40"
-          disabled={(page+1)*pageSize>=(totalCount||0)} onClick={()=>onPageChange(page+1)}>Next</button>
+          disabled={!hasMore} onClick={()=>onPageChange(page+1)}>Next</button>
       </nav>}
     </div>
   </div>;

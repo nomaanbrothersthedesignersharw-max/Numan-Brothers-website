@@ -1,6 +1,7 @@
 import type { Product } from '../types';
 import type { CatalogProduct } from '../storefront/catalog';
 import { getCmsClient } from './supabaseClient';
+import { readPublicJson } from './publicApi';
 import {cleanSiteText,normalizeOrder,HOME_SECTIONS,FEATURED_CARDS} from './siteContent';
 
 export interface CmsProductRow {
@@ -197,27 +198,26 @@ export interface PublishedData {
   error: string | null;
 }
 export async function loadPublishedData(): Promise<PublishedData> {
-  const client = getCmsClient();
-  if (!client) return { products: [], homepage: HOME_TEMPLATE, categories: [], error: 'CMS not connected. Configure a dedicated Nomaan Brothers Supabase project.' };
   try {
-    const [productsResult, homeResult, categoriesResult] = await Promise.all([
-      client.from('nb_products')
-        .select('id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,video_urls,price,offer_price,customizable,status,sort_rank,created_at,updated_at')
-        .eq('status','published').order('sort_rank', { ascending: true }).limit(12),
-      client.from('nb_home_public').select('content').eq('key','home').maybeSingle(),
-      client.from('nb_categories').select('path,department,label,description,image_url,active,sort_order').eq('active',true),
-    ]);
-    const error = productsResult.error || homeResult.error || categoriesResult.error;
-    if (error) throw error;
+    const response = await readPublicJson<{
+      products?: CmsProductRow[];
+      homepage?: unknown;
+      categories?: CmsCategoryRow[];
+    }>('/api/storefront', 30_000);
+
     return {
-      products: (productsResult.data || []).map((p) => rowToProduct(p as CmsProductRow)),
-      homepage: cleanHome(homeResult.data?.content),
-      categories: (categoriesResult.data || []) as CmsCategoryRow[],
+      products: (Array.isArray(response.products) ? response.products : []).map(rowToProduct),
+      homepage: cleanHome(response.homepage),
+      categories: Array.isArray(response.categories) ? response.categories : [],
       error: null,
     };
   } catch (error) {
-    return { products: [], homepage: HOME_TEMPLATE, categories: [],
-      error: error instanceof Error ? error.message : 'Unable to read the published catalogue.' };
+    return {
+      products: [],
+      homepage: HOME_TEMPLATE,
+      categories: [],
+      error: error instanceof Error ? error.message : 'Unable to read the published catalogue.',
+    };
   }
 }
 
