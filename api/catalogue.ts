@@ -1,4 +1,4 @@
-import { COLLECTION_ROUTES } from '../src/storefront/navigation';
+import { PUBLIC_COLLECTION_PATHS } from './collectionPaths.mjs';
 
 const apiUrl = process.env.VITE_SUPABASE_URL?.trim() || '';
 const publishableKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || '';
@@ -28,10 +28,9 @@ const isProductHandle = (value: string) =>
   (isUuid(value) || isSku(value) || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value));
 const cleanSearch = (value: string) =>
   value.normalize('NFKC').replace(/[^a-zA-Z0-9 -]/g, ' ').trim().replace(/\s+/g, ' ').slice(0, 72);
-const isCollectionPath = (path: string) => COLLECTION_ROUTES.some((item) => item.path === path);
-const collectionPaths = (path: string) => COLLECTION_ROUTES
-  .filter((item) => item.path === path || item.path.startsWith(path + '/'))
-  .map((item) => item.path);
+const isCollectionPath = (path: string) => PUBLIC_COLLECTION_PATHS.includes(path);
+const collectionPaths = (path: string) => PUBLIC_COLLECTION_PATHS
+  .filter((item) => item === path || item.startsWith(path + '/'));
 
 function json(status: number, body: unknown, cache = 'no-store'): Response {
   return new Response(JSON.stringify(body), {

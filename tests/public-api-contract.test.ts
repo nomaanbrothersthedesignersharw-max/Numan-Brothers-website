@@ -1,10 +1,15 @@
 import { describe, expect, test } from 'bun:test';
+import { COLLECTION_ROUTES } from '../src/storefront/navigation';
+import { PUBLIC_COLLECTION_PATHS } from '../api/collectionPaths.mjs';
 import { readFileSync } from 'node:fs';
 
 const root = new URL('../', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), 'utf8');
 
 describe('Cached public catalogue endpoints', () => {
+  test('server route manifest stays aligned with the storefront taxonomy', () => {
+    expect(PUBLIC_COLLECTION_PATHS).toEqual(COLLECTION_ROUTES.map((route) => route.path));
+  });
   test('homepage data uses a short shared CDN cache and only published products', () => {
     const source = read('api/storefront.ts');
     expect(source).toContain('s-maxage=60');
