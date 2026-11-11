@@ -55,13 +55,13 @@ describe('Instagram-only footer release contracts',()=>{
     expect(studio).toContain('Instagram profile URL');
     expect(studio).not.toContain('All nine branded icons');
   });
-  test('remote branch cleanup stays manual and repository CI is read-only',()=>{
+  test('GitHub handles merged branch deletion and repository CI remains read-only',()=>{
     const workflow=src('.github/workflows/quality.yml');
     expect(workflow).not.toContain('cleanup-merged-working-branches:');
     expect(workflow).not.toContain('contents: write');
     expect(workflow).toContain('contents: read');
     const readme=src('README.md');
-    expect(readme).toContain('Delete merged working branches manually');
-    expect(readme).toContain('CI does not automatically delete remote branches');
+    expect(readme).toContain('GitHub is configured to delete merged head branches automatically');
+    expect(readme).toContain('Protect `main` with required status checks');
   });
 });
