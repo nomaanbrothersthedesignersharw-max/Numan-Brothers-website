@@ -286,7 +286,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
           <div className="nb-skeleton mt-2 h-3 w-2/5"/>
         </div>)}
       </div>
-    </section> : related.length>0&&<section className=""mx-auto max-w-[1400px] px-5 pb-20 md:px-12 lg:px-20" aria-labelledby="related-garments-title">
+    </section> : related.length>0&&<section className="mx-auto max-w-[1400px] px-5 pb-20 md:px-12 lg:px-20" aria-labelledby="related-garments-title">
       <div className="mb-7 flex flex-wrap items-end justify-between gap-3 border-b border-[#d7c8b4] pb-6">
         <div>
           <p className="mb-2 text-[10px] font-bold uppercase tracking-[.2em] text-[#9e7850]">Selected for your occasion</p>
