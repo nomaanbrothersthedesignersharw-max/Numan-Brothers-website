@@ -146,6 +146,9 @@ jobs:
           NB_MODE: live
           NB_TEST_URL: https://numan-brothers-website-nine.vercel.app
         run: node scripts/qa-browser-smoke.mjs
+      - name: Verify production security headers and Supabase commissioning health
+        if: github.ref == 'refs/heads/main'
+        run: node scripts/smoke-deployment.mjs https://numan-brothers-website-nine.vercel.app
       - name: Retain mobile and desktop screenshots
         if: always()
         uses: actions/upload-artifact@v7
