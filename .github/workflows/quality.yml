@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  statuses: read
 
 jobs:
   typecheck-and-build:
@@ -139,6 +140,31 @@ jobs:
             sleep 1
           done
           node scripts/qa-browser-smoke.mjs
+      - name: Wait for the matching production deployment
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            state="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/status" --jq '[.statuses[] | select(.context == "Vercel")] | last | .state // empty')"
+            case "$state" in
+              success)
+                echo "Vercel has deployed this exact commit to Production."
+                exit 0
+                ;;
+              failure|error)
+                echo "::error::Vercel failed to deploy this commit to Production."
+                exit 1
+                ;;
+              *)
+                echo "Waiting for Vercel Production status for $GITHUB_SHA (attempt $attempt/60)..."
+                sleep 10
+                ;;
+            esac
+          done
+          echo "::error::No successful Vercel Production deployment status for $GITHUB_SHA within 10 minutes."
+          exit 1
       - name: Test live storefront and same-origin Studio after main deploy
         if: github.ref == 'refs/heads/main'
         env:
