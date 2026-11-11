@@ -73,6 +73,11 @@ A Vercel deployment marked READY proves that an artifact deployed; it does not p
 - [ ] Approve real product photography, descriptions, sizes, prices (if displayed), usage rights, contact details, official social URL, business address and legal Privacy/Terms/Returns text. Never invent these.
 
 ### Supabase and CMS acceptance
+- [ ] Verify Database SSL enforcement and review Network Restrictions against the actual Vercel/Supabase connection architecture before enabling allow-lists.
+- [ ] Verify Auth email confirmation for staff invitations, OTP/recovery-link expiry (one hour or less), Auth rate limits, custom SMTP, and removal of all test phone numbers.
+- [ ] Verify MFA is enabled for organization owners and CMS staff where appropriate; maintain a second trusted organization owner or a documented recovery route.
+- [ ] Add and test CAPTCHA/IP-based abuse controls for anonymous customer reviews before promoting the review form. The current honeypot and duplicate guard are not a full abuse-prevention system.
+- [ ] Run authenticated owner/admin/editor tests for Studio login, session expiry, role removal and role revocation. Public live smoke intentionally does not sign in or mutate data.
 - [ ] Run authenticated owner/admin/editor tests for Studio login, session expiry, role removal and role revocation. Public live smoke intentionally does not sign in or mutate data.
 - [ ] Run a supervised media lifecycle test using a non-production asset: upload, approve, attach, reject revocation while referenced, detach, revoke, archive, restore and delete. Verify rejection for stale/non-owner roles and referenced assets.
 - [ ] Verify actual public and authenticated RLS/Storage behavior using owner, editor, anonymous and authenticated test sessions; static policy inspection alone is not sufficient.
