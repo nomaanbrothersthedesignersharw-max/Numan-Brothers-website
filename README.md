@@ -11,7 +11,7 @@ This section records verified service state, not a promise that every commercial
 | GitHub | `nomaanbrothersthedesignersharw-max/Numan-Brothers-website`; one branch (`main`); 11 merged PRs; no open PRs |
 | Latest source | `4bcfa4b628f1299def1bdf8dfbdb81c9a3a7dfe4` |
 | GitHub Actions | Website quality workflow and CodeQL passed on the latest source; local browser smoke passed 101/101 checks across the responsive matrix and live production smoke passed 15/15 checks |
-| Supabase Preview check | Still fails against the old project ref `xiidzpsyuvfhyjudrrfq`; see the migration note below |
+| Supabase Preview check | Latest PR check is SKIPPED (no Supabase preview branch is associated); the check details still point at the old project ref `xiidzpsyuvfhyjudrrfq` |
 | Vercel | One Vite project, `numan-brothers-website`; latest Production deployment is READY on the latest source SHA |
 | Public host | https://numan-brothers-website-nine.vercel.app/ |
 | Studio | Same project at `/studio`; no separate CMS deployment |
@@ -29,7 +29,7 @@ This section records verified service state, not a promise that every commercial
 
 The chosen production database is `uinhybkdzevpxnugtvzf`. A read-only schema audit verified the expected catalogue tables, RLS, policies, functions, triggers, Storage buckets and required search indexes before the migration ledger was reconciled. Five pre-existing migration records were matched exactly to their SQL source; 16 earlier migrations were recorded as already represented in the live schema. **No historical migration SQL or fresh-project installer was replayed against production.**
 
-The GitHub Supabase Preview check is still linked to the old, inaccessible project `xiidzpsyuvfhyjudrrfq` and reports a duplicate `nb_categories_public_select` policy. This is an external Supabase GitHub integration connection problem; it is not evidence that the selected `uinhy...` database is missing those migrations. Reconnect the GitHub integration from the selected Supabase project's **Project Settings → Integrations**, choose this repository and set the working directory to `.`. Confirm the resulting check links to `uinhybkdzevpxnugtvzf` before relying on it. Supabase GitHub integration configuration is documented at https://supabase.com/docs/guides/deployment/branching/github-integration.
+The latest GitHub Supabase Preview check is SKIPPED because no Supabase branch is associated with the PR; its details URL still points at the old project `xiidzpsyuvfhyjudrrfq`. An earlier run against that old integration reported a duplicate `nb_categories_public_select` policy. This is an external Supabase GitHub integration connection problem; it is not evidence that the selected `uinhy...` database is missing those migrations. Do not count a skipped check as a pass. Reconnect the GitHub integration from the selected Supabase project's **Project Settings → Integrations**, choose this repository and set the working directory to `.`. Confirm the resulting check links to `uinhybkdzevpxnugtvzf` before relying on it. Supabase GitHub integration configuration is documented at https://supabase.com/docs/guides/deployment/branching/github-integration.
 
 ### Current release blockers
 
