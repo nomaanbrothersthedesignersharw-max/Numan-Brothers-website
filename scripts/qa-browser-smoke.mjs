@@ -25,6 +25,49 @@ const mockProduct={
 };
 async function mockCmsRoutes(page,{emptyContacts=false,heroVideo=false,configuredSocial=false}={}){
   if(process.env.NB_MOCK_CMS!=='1')return;
+
+  // Public storefront reads now use same-origin Vercel API routes. Keep the
+  // browser fixture aligned with that contract so responsive tests exercise
+  // real page states instead of the empty fallback used when APIs are absent
+  // from the local Vite dev server.
+  const homepage=emptyContacts?{}:{
+    contactWhatsapp:'919876543210',contactPhone:'919876543211',
+    sectionVideos:heroVideo?{hero:'https://fixture.supabase.co/intro-film.mp4'}:{},
+    socialLinks:configuredSocial?{
+      instagram:'https://www.instagram.com/nomaanbrothers/',
+      facebook:'https://instagram.com/pretending-to-be-facebook',
+    }:{},
+  };
+  await page.route('**/api/storefront',async route=>route.fulfill({
+    status:200,contentType:'application/json',
+    body:JSON.stringify({products:[mockProduct],homepage,categories:[]}),
+  }));
+  await page.route('**/api/catalogue',async route=>{
+    const url=new URL(route.request().url());
+    const params=url.searchParams;
+    const handle=params.get('product');
+    if(handle!==null){
+      const product=handle===mockProduct.id||handle===mockProduct.slug||handle===mockProduct.sku
+        ? mockProduct : null;
+      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({product})});
+    }
+    if(params.has('related')){
+      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({products:[]})});
+    }
+    const pageNumber=Number(params.get('page')||'0');
+    const routePath=params.get('route')||'';
+    const query=(params.get('q')||'').toLowerCase();
+    const isMenDepartment=routePath==='/men';
+    const isMatchingSherwani=!routePath||isMenDepartment||routePath==='/men/sherwani';
+    const matchesQuery=!query||mockProduct.title.toLowerCase().includes(query)||mockProduct.sku.toLowerCase().includes(query);
+    const products=pageNumber===0&&!routePath.startsWith('/kids')&&isMatchingSherwani&&matchesQuery
+      ? [mockProduct] : [];
+    return route.fulfill({
+      status:200,contentType:'application/json',
+      body:JSON.stringify({products,page:pageNumber,pageSize:24,hasMore:false}),
+    });
+  });
+
   await page.route('https://fixture.supabase.co/**',async route=>{
     const url=new URL(route.request().url());
     const path=url.pathname;

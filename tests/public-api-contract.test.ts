@@ -28,6 +28,15 @@ describe('Cached public catalogue endpoints', () => {
     expect(source).toContain('s-maxage=45');
   });
 
+  test('local browser fixture mocks the same-origin public data API contract', () => {
+    const source = read('scripts/qa-browser-smoke.mjs');
+    expect(source).toContain("page.route('**/api/storefront'");
+    expect(source).toContain("page.route('**/api/catalogue'");
+    expect(source).toContain('homepage,categories:[]');
+    expect(source).toContain('hasMore:false');
+    expect(source).toContain('configuredSocial');
+  });
+
   test('private commissioning checks stay non-cacheable', () => {
     const source = read('api/cms-status.ts');
     expect(source).toContain("'Cache-Control':'no-store, max-age=0'");
