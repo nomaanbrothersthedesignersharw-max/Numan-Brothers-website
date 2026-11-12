@@ -28,12 +28,29 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   const [selectedSize,setSelectedSize]=useState('');
   const [shareStatus,setShareStatus]=useState('');
   const [related,setRelated]=useState<CatalogProduct[]>([]);
+  const [relatedLoading,setRelatedLoading]=useState(garment.slug!=='sample-plain-sherwani');
+  const [imageReady,setImageReady]=useState(false);
+  const [imageFailed,setImageFailed]=useState(false);
   useEffect(()=>{
     let active=true;
-    if(garment.slug!=='sample-plain-sherwani')void loadRelatedProducts(garment,4).then(rows=>{if(active)setRelated(rows)});
+    if(garment.slug==='sample-plain-sherwani'){
+      setRelated([]);
+      setRelatedLoading(false);
+      return()=>{active=false};
+    }
+    setRelatedLoading(true);
+    void loadRelatedProducts(garment,4).then(rows=>{
+      if(active)setRelated(rows);
+    }).finally(()=>{
+      if(active)setRelatedLoading(false);
+    });
     return()=>{active=false};
-  },[garment.id]);
+  },[garment.id,garment.slug]);
   const visual = images[selectedImage] || productImage(product);
+  useEffect(()=>{
+    setImageReady(false);
+    setImageFailed(false);
+  },[visual]);
   const siblings = getRelatedCollectionLinks(theme.collectionPath)
     .filter(link => link.path !== theme.collectionPath).slice(0, 5);
   const productVideos = Array.from(new Set([
@@ -98,12 +115,15 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
             <div className="relative mx-auto max-w-[700px]">
               <div className="absolute -left-3 -top-3 h-32 w-32 border-l border-t border-white/45 md:-left-5 md:-top-5" aria-hidden="true"/>
               <div className="group relative aspect-[3/4] overflow-hidden border border-white/20 bg-[#dbcbb4]/20 shadow-[0_30px_85px_-26px_rgba(0,0,0,.65)]">
-                {visual ? <img src={visual} alt={product.title}
-                  loading="eager" fetchPriority="high" decoding="async"
-                  className="h-full w-full object-cover object-top motion-safe:transition-transform motion-safe:duration-700 motion-safe:group-hover:scale-[1.025]"/> :
-                  <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#765d4c] via-[#3c302a] to-[#21191a]">
-                    <span className="font-serif text-5xl italic text-[#ead5b3]/65 md:text-7xl">Nomaan</span>
-                  </div>}
+                {visual && !imageFailed ? <>
+                  {!imageReady && <div className="nb-skeleton nb-skeleton--dark absolute inset-0" aria-hidden="true"/>}
+                  <img src={visual} alt={product.title} onLoad={()=>setImageReady(true)}
+                    onError={()=>{setImageFailed(true);setImageReady(false);}}
+                    loading="eager" fetchPriority="high" decoding="async"
+                    className={'h-full w-full object-cover object-top motion-safe:transition-transform motion-safe:duration-700 motion-safe:group-hover:scale-[1.025] transition-opacity duration-300 ' + (imageReady?'opacity-100':'opacity-0')}/>
+                </> : <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#765d4c] via-[#3c302a] to-[#21191a]">
+                  <span className="font-serif text-5xl italic text-[#ead5b3]/65 md:text-7xl">Nomaan</span>
+                </div>}
                 <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/40 to-transparent px-5 py-5 text-[10px] font-semibold uppercase tracking-[.2em] text-white">
                   <span>{siteText(home,'product.brand')}</span>
                   {images.length > 0 && <span>{String(selectedImage + 1).padStart(2,'0')} / {String(images.length).padStart(2,'0')}</span>}
@@ -250,7 +270,23 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
         </V2Link>)}
       </div>
     </section>
-    {related.length>0&&<section className="mx-auto max-w-[1400px] px-5 pb-20 md:px-12 lg:px-20" aria-labelledby="related-garments-title">
+    {relatedLoading ? <section className="mx-auto max-w-[1400px] px-5 pb-20 md:px-12 lg:px-20" role="status" aria-busy="true" aria-label="Loading related garments">
+      <span className="sr-only">Finding related garments…</span>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-5 border-b border-[#d7c8b4] pb-6">
+        <div className="w-full max-w-sm">
+          <div className="nb-skeleton h-2.5 w-32"/>
+          <div className="nb-skeleton mt-4 h-8 w-4/5"/>
+        </div>
+        <div className="nb-skeleton h-3 w-32"/>
+      </div>
+      <div className="nb-responsive-grid grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-5 lg:grid-cols-4">
+        {Array.from({length:4},(_,index)=><div key={index}>
+          <div className="nb-skeleton aspect-[3/4] w-full"/>
+          <div className="nb-skeleton mt-4 h-4 w-4/5"/>
+          <div className="nb-skeleton mt-2 h-3 w-2/5"/>
+        </div>)}
+      </div>
+    </section> : related.length>0&&<section className="mx-auto max-w-[1400px] px-5 pb-20 md:px-12 lg:px-20" aria-labelledby="related-garments-title">
       <div className="mb-7 flex flex-wrap items-end justify-between gap-3 border-b border-[#d7c8b4] pb-6">
         <div>
           <p className="mb-2 text-[10px] font-bold uppercase tracking-[.2em] text-[#9e7850]">Selected for your occasion</p>

@@ -13,6 +13,7 @@ import V2Header from './components/V2Header';
 import FloatingContactDock from './components/FloatingContactDock';
 import SocialLinks from './components/SocialLinks';
 import V2Reviews from './components/V2Reviews';
+import { CollectionPageSkeleton, ProductDetailSkeleton, ProductGridSkeleton } from './components/StorefrontLoading';
 import V2Home from './components/V2Home';
 
 import V2Footer from './components/V2Footer';
@@ -61,6 +62,8 @@ export default function App() {
   const [page,setPage] = useState(0);
   const [routeResult,setRouteResult] = useState<{key:string;data:CataloguePage}|null>(null);
   const [detail,setDetail] = useState<{id:string;product:CatalogProduct|null}|null>(null);
+  const [catalogRequestVersion,setCatalogRequestVersion] = useState(0);
+  const retryCatalogue = () => setCatalogRequestVersion(version => version + 1);
   const routeKey = path + '|' + searchQuery + '|' + page;
   useEffect(()=>setPage(0),[path,searchQuery]);
   useEffect(()=>{
@@ -72,7 +75,7 @@ export default function App() {
     if(selectedId)void loadProductById(selectedId).then(product=>{if(active)setDetail({id:selectedId,product})});
     else setDetail(null);
     return ()=>{active=false};
-  },[path,searchQuery,page]);
+  },[path,searchQuery,page,catalogRequestVersion]);
   const activeRoutePage = routeResult?.key===routeKey ? routeResult.data : null;
   const matches = activeRoutePage?.products || [];
   const product = selectedId===SAMPLE_SHERWANI.slug ? SAMPLE_SHERWANI : selectedId && detail?.id===selectedId ? detail.product : undefined;
@@ -105,35 +108,38 @@ export default function App() {
       {!catalogLoading && siteData.error && <div role="status" className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-center text-xs text-amber-900">
         The online catalogue is temporarily unavailable. Contact the showroom for current styles.
       </div>}
-      <Suspense fallback={<div className="flex min-h-[45vh] items-center justify-center px-5 text-sm text-stone-600" role="status">Loading collection…</div>}>
+      <Suspense fallback={<CollectionPageSkeleton/>}>
       {path === '/' ? <V2Home products={published} home={siteData.homepage} categories={siteData.categories} onNavigate={navigate}/> :
        collection ? (activeRoutePage ? <V2Collection route={collection} products={matches}
          bannerImage={categoryOverride?.image_url && isSafeHttps(categoryOverride.image_url) ? categoryOverride.image_url : undefined}
-         home={siteData.homepage} categories={siteData.categories} totalCount={activeRoutePage.count}
+         home={siteData.homepage} categories={siteData.categories} hasMore={activeRoutePage.hasMore}
+         error={activeRoutePage.error} onRetry={retryCatalogue}
          page={page} pageSize={activeRoutePage.pageSize} onPageChange={setPage} onNavigate={navigate}/> :
-         <p role="status" className="p-12 text-center text-stone-500">Loading collection…</p>) :
-       selectedId && !detail && selectedId!==SAMPLE_SHERWANI.slug ? <p role="status" className="p-12 text-center text-stone-500">Loading product…</p> :
+         <CollectionPageSkeleton/>) :
+       selectedId && !detail && selectedId!==SAMPLE_SHERWANI.slug ? <ProductDetailSkeleton/> :
        product ? <V2Product key={product.id} product={product} home={siteData.homepage}
          whatsappNumber={siteData.homepage.contactWhatsapp} contactPhone={siteData.homepage.contactPhone} onNavigate={navigate}/> :
        path === '/search' ? <section className="mx-auto min-h-[70vh] min-w-0 max-w-[1360px] px-4 py-16 min-[360px]:px-5 md:px-12">
          <V2Reveal>
            <p className="mb-5 text-[10px] font-bold uppercase tracking-[.24em] text-[#a37f50]">{siteText(siteData.homepage,'search.eyebrow')}</p>
            <h1 className="break-words font-serif text-[clamp(2.4rem,6vw,5.5rem)] tracking-[-.05em] text-[#29221c]">{siteText(siteData.homepage,'search.title')}</h1>
-           <p className="mt-5 mb-12 text-sm text-[#817164]">{searchQuery ? 'Results for "' + searchQuery + '"' : 'Enter a product name or browse a collection.'} · {activeRoutePage?.count ?? '—'} styles</p>
+           <p className="mt-5 mb-12 text-sm text-[#817164]">{searchQuery ? 'Results for "' + searchQuery + '"' : 'Enter a product name or browse a collection.'} · {activeRoutePage ? 'Showing ' + matches.length + ' styles' : 'Loading styles'}</p>
          </V2Reveal>
-         {!activeRoutePage ? <p role="status">Searching catalogue…</p> : matches.length ? <V2ProductGrid products={matches} home={siteData.homepage} onNavigate={navigate}/> :
+         {!activeRoutePage ? <ProductGridSkeleton count={8}/> : activeRoutePage.error ?
+          <div className="border border-amber-200 bg-amber-50 px-6 py-8 text-center text-sm text-amber-900" role="status">
+            We couldn't load these results. <button type="button" onClick={retryCatalogue} className="ml-2 min-h-11 underline underline-offset-4">Try again</button>
+          </div> : matches.length ? <V2ProductGrid products={matches} home={siteData.homepage} onNavigate={navigate}/> :
           <div className="border border-[#e4d5c2] bg-[#f5ece0] px-7 py-14 text-center">
             <h2 className="font-serif text-3xl">{siteText(siteData.homepage,'search.emptyTitle')}</h2>
             <p className="mt-4 text-sm leading-7 text-[#766b5e]">{siteText(siteData.homepage,'search.emptyText')}</p>
             <V2Link href="/men" onNavigate={navigate} className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-[#805e38]">{siteText(siteData.homepage,'search.browse')} <ArrowRight size={16}/></V2Link>
           </div>}
-         {activeRoutePage && activeRoutePage.count>activeRoutePage.pageSize && <nav aria-label="Search results pages" className="mt-10 flex flex-wrap items-center justify-center gap-3">
+         {activeRoutePage && (activeRoutePage.hasMore || page>0) && <nav aria-label="Search results pages" className="mt-10 flex flex-wrap items-center justify-center gap-3">
            <button type="button" className="min-h-11 border border-stone-300 px-5 disabled:opacity-40"
              disabled={page===0} onClick={()=>setPage(current=>Math.max(0,current-1))}>Previous</button>
-           <span className="self-center text-sm">Page {page+1} of {Math.ceil(activeRoutePage.count/activeRoutePage.pageSize)}</span>
+           <span className="self-center text-sm">Page {page+1}</span>
            <button type="button" className="min-h-11 border border-stone-300 px-5 disabled:opacity-40"
-             disabled={(page+1)*activeRoutePage.pageSize>=activeRoutePage.count}
-             onClick={()=>setPage(current=>current+1)}>Next</button>
+             disabled={!activeRoutePage.hasMore} onClick={()=>setPage(current=>current+1)}>Next</button>
          </nav>}
        </section> :
        legalPage ? <section className="mx-auto min-h-[65vh] max-w-[1050px] px-5 py-16 sm:px-7 md:px-12 md:py-24" aria-labelledby="nb-legal-title">

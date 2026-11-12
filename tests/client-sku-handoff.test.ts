@@ -27,9 +27,10 @@ describe('client-owned CMS handoff',()=>{
     expect(ui).not.toContain('setSkuEdited');
   });
   test('allows read-only SKU product lookup and safe photo batch tagging',()=>{
-    const publicRoute=source('src/lib/catalogQueries.ts');
+    const publicRoute=source('api/catalogue.ts');
     const seoRoute=source('api/product.ts');
-    expect(publicRoute).toContain("isSku(handle)?'sku':'slug'");
+    expect(publicRoute).toContain("isUuid(product) ? 'id' : isSku(product) ? 'sku' : 'slug'");
+    expect(publicRoute).toContain("url.searchParams.set('status', 'eq.published')");
     expect(seoRoute).toContain("isSku?'sku':'slug'");
     const importer=source('src/lib/importEngine.ts');
     expect(importer).toContain("client.rpc('nb_reserve_skus'");
