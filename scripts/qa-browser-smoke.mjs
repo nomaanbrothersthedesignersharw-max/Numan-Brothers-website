@@ -42,7 +42,7 @@ async function mockCmsRoutes(page,{emptyContacts=false,heroVideo=false,configure
     status:200,contentType:'application/json',
     body:JSON.stringify({products:[mockProduct],homepage,categories:[]}),
   }));
-  await page.route('**/api/catalogue',async route=>{
+  await page.route('**/api/catalogue**',async route=>{
     const url=new URL(route.request().url());
     const params=url.searchParams;
     const handle=params.get('product');
