@@ -31,7 +31,7 @@ describe('Cached public catalogue endpoints', () => {
   test('local browser fixture mocks the same-origin public data API contract', () => {
     const source = read('scripts/qa-browser-smoke.mjs');
     expect(source).toContain("page.route('**/api/storefront'");
-    expect(source).toContain("page.route('**/api/catalogue'");
+    expect(source).toContain("page.route('**/api/catalogue**'");
     expect(source).toContain('homepage,categories:[]');
     expect(source).toContain('hasMore:false');
     expect(source).toContain('configuredSocial');
