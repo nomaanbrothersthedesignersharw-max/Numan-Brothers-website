@@ -13,6 +13,27 @@ export function Field({label,children}: {label:string;children:React.ReactNode})
 export function ErrorText({message}:{message:string|null}) {
   return message ? <p role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{message}</p> : null;
 }
+
+/** Extracts the real JSON error message from Supabase Edge Function HTTP errors. */
+export async function invokeMediaAction(
+  client: SupabaseClient,
+  id: string,
+  action: 'approve' | 'revoke' | 'archive' | 'restore' | 'delete',
+): Promise<void> {
+  const { data, error } = await client.functions.invoke('nb-media-approval', {
+    body: { id, action },
+  });
+  if (!error && data?.ok) return;
+  let detail = '';
+  const ctx = error && typeof error === 'object' ? (error as { context?: Response }).context : undefined;
+  if (ctx && typeof ctx.json === 'function') {
+    try {
+      const parsed = (await ctx.json()) as { error?: string };
+      if (parsed?.error) detail = parsed.error;
+    } catch { /* ignore non-JSON body */ }
+  }
+  throw new Error(detail || data?.error || error?.message || `Media ${action} failed.`);
+}
 /** Search/page directly on the server instead of loading the full media library. */
 export function AssetPicker({
   label, media, selected, onChange, allowVideo = false, multiple = false, client,

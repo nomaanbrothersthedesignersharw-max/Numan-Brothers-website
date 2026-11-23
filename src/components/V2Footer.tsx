@@ -61,7 +61,8 @@ export default function V2Footer({ onNavigate,home,categories=[] }: {onNavigate:
         <span>Website by</span>
         <a href="https://alif-growth-media.vercel.app/" target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-2 font-semibold text-[#f2d4a1] underline-offset-4 hover:underline">
-          <span aria-hidden="true" className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[#e6c69d]/40 bg-[#2c231c] font-serif text-[10px] font-bold text-[#f2d4a1]">A</span>Alif Growth Media <ArrowUpRight size={14}/>
+          <img src="https://alif-growth-media.vercel.app/favicon.png" alt="" loading="lazy"
+            className="h-7 w-7 rounded-md object-contain"/>Alif Growth Media <ArrowUpRight size={14}/>
         </a>
       </div>
     </div>

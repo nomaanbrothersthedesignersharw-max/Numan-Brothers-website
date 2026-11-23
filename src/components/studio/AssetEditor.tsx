@@ -5,7 +5,7 @@ import type {CmsMediaRow} from '../../lib/cmsData';
 import {mediaPublicUrl} from '../../lib/cmsData';
 import {uploadCmsFile,checkMediaFile} from '../../lib/cmsUpload';
 import {COLLECTION_ROUTES} from '../../storefront/navigation';
-import {ErrorText,inputClass,labelClass,outlineClass,primaryClass} from './StudioShared';
+import {ErrorText,inputClass,invokeMediaAction,labelClass,outlineClass} from './StudioShared';
 
 const MEDIA_COLS='id,storage_path,original_name,mime_type,size_bytes,alt_text,department,category_path,archived_at,approved,uploaded_by,created_at';
 type Dept='men'|'kids'|'';
@@ -43,7 +43,7 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
     let alive=true;setLoading(true);
     const timer=setTimeout(async()=>{
       const search=term.replace(/[^a-zA-Z0-9 _.-]/g,' ').trim().slice(0,60);
-      let query=client.from('nb_media').select(MEDIA_COLS,{count:'exact'})
+      let query=client.from('nb_media').select(MEDIA_COLS,{count:'planned'})
         .eq('approved',true).is('archived_at',null)
         .like('mime_type',allowVideo?'video/%':'image/%');
       if(dept)query=query.eq('department',dept);
@@ -92,23 +92,27 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
     }catch(e){setError(e instanceof Error?e.message:'Upload failed.');}
     finally{setUploading(false);setProgress(0);setDragging(false);}
   };
-  const deleteFromDatabase=async(url:string)=>{
+  const deleteFromDatabase=async(rawUrl:string,assetId?:string)=>{
     if(!canPublish)return;
     if(!window.confirm('Permanently DELETE this file from both Supabase Storage and the database?\n\nIf it is used by a published page or saved draft, deletion will be refused. This cannot be undone.'))return;
-    setDeletingUrl(url);setError(null);setNotice(null);
+    const url=rawUrl.split('?')[0];
+    setDeletingUrl(rawUrl);setError(null);setNotice(null);
     try{
-      const prefix=mediaPublicUrl('');
-      if(!prefix || !url.startsWith(prefix))throw new Error('Only files from this store\'s Media library can be permanently deleted.');
-      const storagePath=decodeURIComponent(url.slice(prefix.length));
-      if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp|avif|gif|mp4|webm)$/i.test(storagePath))
-        throw new Error('This media file needs manual review before deletion.');
-      const {data:asset,error:findError}=await client.from('nb_media')
-        .select('id').eq('storage_path',storagePath).maybeSingle();
-      if(findError)throw findError;
-      if(!asset)throw new Error('Media record not found. Refresh the library.');
-      const {data,error}=await client.functions.invoke('nb-media-approval',{body:{id:asset.id,action:'delete'}});
-      if(error || !data?.ok)throw new Error(data?.error||error?.message||'Deletion blocked by Supabase.');
-      onChange(selected.filter(x=>x!==url));
+      let id=assetId;
+      if(!id){
+        const prefix=mediaPublicUrl('');
+        if(!prefix || !url.startsWith(prefix))throw new Error('Only files from this store\'s Media library can be permanently deleted.');
+        const storagePath=decodeURIComponent(url.slice(prefix.length)).replace(/^\/+/,'');
+        if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp|avif|gif|mp4|webm)$/i.test(storagePath))
+          throw new Error('This media file needs manual review before deletion.');
+        const {data:asset,error:findError}=await client.from('nb_media')
+          .select('id').eq('storage_path',storagePath).maybeSingle();
+        if(findError)throw findError;
+        if(!asset)throw new Error('Media record not found. Refresh the library.');
+        id=asset.id as string;
+      }
+      await invokeMediaAction(client, id, 'delete');
+      onChange(selected.filter(x=>x.split('?')[0]!==url));
       setNotice('File permanently removed from Supabase Storage and its media database record.');
       setReload(n=>n+1);onUploaded?.();
     }catch(cause){
@@ -176,16 +180,22 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
           onChange={e=>{setTerm(e.target.value);setPage(0)}} placeholder="Sherwani 1, SKU…"/></div>
       </div>
       {loading?<p role="status" className="p-3 text-xs">Searching approved media…</p>:rows.length===0?<p className="p-3 text-xs text-stone-500">No approved items in this category yet. Drop a file above or use Media.</p>:
-        <div className="nb-responsive-grid grid max-h-80 grid-cols-2 gap-2 overflow-auto sm:grid-cols-3 xl:grid-cols-4">{rows.map(asset=>{
+        <div className="nb-responsive-grid grid max-h-80 grid-cols-1 gap-2 overflow-auto min-[360px]:grid-cols-2 sm:grid-cols-3 xl:grid-cols-4">{rows.map(asset=>{
           const url=mediaPublicUrl(asset.storage_path);const isSelected=selected.includes(url);
-          return <button type="button" key={asset.id} title={asset.original_name} onClick={()=>choose(url)}
-            className={'overflow-hidden rounded-md border-2 text-left '+(isSelected?'border-amber-700 bg-amber-50':'border-stone-200 bg-white')}>
-            {allowVideo?<div className="flex aspect-[4/3] items-center justify-center bg-stone-800 text-white"><Video/></div>:
-              <img src={url} alt={asset.alt_text||asset.original_name} loading="lazy" className="aspect-[4/3] w-full object-cover"/>}
-            <div className="flex items-center justify-between gap-1 p-2 text-[11px]">
-              <span className="truncate">{asset.original_name}</span>{isSelected&&<span className="font-semibold text-amber-800">✓</span>}
-            </div>
-          </button>;
+          return <div key={asset.id} className={'flex flex-col overflow-hidden rounded-md border-2 '+(isSelected?'border-amber-700 bg-amber-50':'border-stone-200 bg-white')}>
+            <button type="button" title={asset.original_name} onClick={()=>choose(url)} className="text-left">
+              {allowVideo?<div className="flex aspect-[4/3] items-center justify-center bg-stone-800 text-white"><Video/></div>:
+                <img src={url} alt={asset.alt_text||asset.original_name} loading="lazy" className="aspect-[4/3] w-full object-cover"/>}
+              <div className="flex items-center justify-between gap-1 p-2 text-[11px]">
+                <span className="truncate">{asset.original_name}</span>{isSelected&&<span className="font-semibold text-amber-800">✓</span>}
+              </div>
+            </button>
+            {canPublish&&<button type="button" disabled={deletingUrl!==null}
+              onClick={()=>void deleteFromDatabase(url,asset.id)}
+              className="border-t border-stone-200 px-2 py-1.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50">
+              {deletingUrl===url?'Deleting…':'Delete'}
+            </button>}
+          </div>;
         })}</div>}
       {total>24&&<div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <button type="button" className={outlineClass} disabled={page===0} onClick={()=>setPage(x=>x-1)}>Previous</button>

@@ -4,7 +4,7 @@ import {ImagePlus,CheckCircle2,Upload,Archive,Trash2,RotateCcw} from 'lucide-rea
 import {COLLECTION_ROUTES} from '../../storefront/navigation';
 import { type CmsMediaRow, mediaPublicUrl } from '../../lib/cmsData';
 import { uploadCmsFile } from '../../lib/cmsUpload';
-import { ErrorText, inputClass, outlineClass, primaryClass } from './StudioShared';
+import { ErrorText, inputClass, invokeMediaAction, outlineClass, primaryClass } from './StudioShared';
 
 interface Props { client: SupabaseClient; userId:string; canPublish:boolean; onMediaChange:()=>void; }
 export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props) {
@@ -34,7 +34,7 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
     const seq=++requestSequence.current;
     setLoading(true);
     let request=client.from('nb_media')
-      .select('id,storage_path,original_name,mime_type,size_bytes,alt_text,department,category_path,archived_at,approved,uploaded_by,created_at',{count:'exact'});
+      .select('id,storage_path,original_name,mime_type,size_bytes,alt_text,department,category_path,archived_at,approved,uploaded_by,created_at',{count:'planned'});
     const term=search.replace(/[^a-zA-Z0-9 _.-]/g,' ').trim().slice(0,60);
     if(term)request=request.ilike('original_name','%'+term+'%');
     if(typeFilter!=='all')request=request.like('mime_type',typeFilter+'/%');
@@ -78,12 +78,12 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
   const approve = async (asset:CmsMediaRow) => {
     if (!canPublish) return;
     setBusyId(asset.id);setError(null);
-    const {data,error} = await client.functions.invoke('nb-media-approval',{
-      body:{id:asset.id,action:asset.approved?'revoke':'approve'},
-    });
-    if (error || !data?.ok) setError(error?.message||data?.error||'Unable to change approval status.'); 
-    else { await refresh();onMediaChange(); }
-    setBusyId(null);
+    try {
+      await invokeMediaAction(client, asset.id, asset.approved ? 'revoke' : 'approve');
+      await refresh();onMediaChange();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to change approval status.');
+    } finally { setBusyId(null); }
   };
   const previewPrivate = async (asset:CmsMediaRow) => {
     setBusyId(asset.id);setError(null);
@@ -113,10 +113,7 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
     if(!window.confirm('Permanently erase this image/video from Supabase Storage AND its database record? This cannot be undone. Referenced live assets cannot be erased.'))return;
     setBusyId(asset.id);setError(null);
     try{
-      const {data,error}=await client.functions.invoke('nb-media-approval',{
-        body:{id:asset.id,action:'delete'},
-      });
-      if(error||!data?.ok)throw new Error(error?.message||data?.error||'Unable to delete asset.');
+      await invokeMediaAction(client, asset.id, 'delete');
       await refresh();onMediaChange();
     }catch(cause){setError(cause instanceof Error?cause.message:'File deletion failed.');}
     finally{setBusyId(null);}
@@ -126,10 +123,11 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
     const verb=asset.archived_at?'restore':'archive';
     if(!window.confirm(verb==='archive'?'Archive this asset? It stays stored and can be restored.':'Restore this media asset to the library?'))return;
     setBusyId(asset.id);setError(null);
-    const {data,error}=await client.functions.invoke('nb-media-approval',{body:{id:asset.id,action:verb}});
-    if(error||!data?.ok)setError(error?.message||data?.error||'Archive operation failed.');
-    else{await refresh();onMediaChange();}
-    setBusyId(null);
+    try{
+      await invokeMediaAction(client, asset.id, verb);
+      await refresh();onMediaChange();
+    }catch(cause){setError(cause instanceof Error?cause.message:'Archive operation failed.');}
+    finally{setBusyId(null);}
   };
   const collectionsFor=(department:'men'|'kids'|'')=>
     COLLECTION_ROUTES.filter(c=>!c.isDepartment&&!c.isGroup&&(!department||c.department===department));
@@ -232,7 +230,7 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
                   disabled={!canPublish && (asset.approved || asset.uploaded_by!==userId)}
                   onChange={e=>setAltDrafts((current)=>({...current,[asset.id]:e.target.value}))}/>
               </label>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:flex sm:flex-wrap">
                 {(canPublish || (!asset.approved && asset.uploaded_by===userId)) && <button type="button"
                   disabled={busyId===asset.id || ((altDrafts[asset.id]??asset.alt_text)===asset.alt_text && (nameDrafts[asset.id]??asset.original_name)===asset.original_name
                     && (tags[asset.id]?.department??null)===asset.department && (tags[asset.id]?.category_path??null)===asset.category_path)}

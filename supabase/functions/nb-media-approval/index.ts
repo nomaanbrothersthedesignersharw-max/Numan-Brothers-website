@@ -98,7 +98,7 @@ const handler = withSupabase({ auth: 'user' }, async (req, ctx) => {
   // Associations are rebuilt transactionally when a product is published.
   const publicUrl = publicBucket.getPublicUrl(path).data.publicUrl
   const [products, homes, collections, legacyImages, legacyVideo,
-    productDraftImages, productDraftVideo, homeDraft] = await Promise.all([
+    productDraftImages, productDraftVideo, productDraftVideos, homeDraft] = await Promise.all([
     ctx.supabaseAdmin.from('nb_product_media')
       .select('product_id', { count: 'exact', head: true }).eq('media_id', id),
     ctx.supabaseAdmin.from('nb_home_public').select('content').eq('key', 'home').maybeSingle(),
@@ -118,12 +118,15 @@ const handler = withSupabase({ auth: 'user' }, async (req, ctx) => {
     ctx.supabaseAdmin.from('nb_product_drafts')
       .select('product_id', { count: 'exact', head: true })
       .eq('content->>videoUrl', publicUrl),
+    ctx.supabaseAdmin.from('nb_product_drafts')
+      .select('product_id', { count: 'exact', head: true })
+      .contains('content', {videoUrls:[publicUrl]}),
     ctx.supabaseAdmin.from('nb_home_drafts')
       .select('content').eq('key','home').maybeSingle(),
   ])
   if (products.error || homes.error || collections.error ||
       legacyImages.error || legacyVideo.error ||
-      productDraftImages.error || productDraftVideo.error || homeDraft.error) {
+      productDraftImages.error || productDraftVideo.error || productDraftVideos.error || homeDraft.error) {
     return json(503, { error: 'Cannot verify media references; revocation denied' })
   }
   const referencedByHome = homepageReferences(homes.data?.content, publicUrl)
@@ -131,6 +134,7 @@ const handler = withSupabase({ auth: 'user' }, async (req, ctx) => {
   if ((products.count ?? 0) > 0 || (collections.count ?? 0) > 0 ||
       (legacyImages.count ?? 0) > 0 || (legacyVideo.count ?? 0) > 0 ||
       (productDraftImages.count ?? 0) > 0 || (productDraftVideo.count ?? 0) > 0 ||
+      (productDraftVideos.count ?? 0) > 0 ||
       referencedByHome || referencedByHomeDraft) {
     return json(409, { error: 'This file is still used by a published page or saved draft. Remove it, save and publish the replacement, then retry deletion.' })
   }
@@ -151,9 +155,9 @@ const handler = withSupabase({ auth: 'user' }, async (req, ctx) => {
     if(asset.approved){
       const {error}=await ctx.supabaseAdmin.from('nb_media').update({approved:false}).eq('id',id)
       if(error)return json(409,{error:'Could not safely revoke approval before deleting'})
+      const {error:publicError}=await publicBucket.remove([path])
+      if(publicError)return json(502,{error:'Could not remove the public file; deletion incomplete'})
     }
-    const {error:publicError}=await publicBucket.remove([path])
-    if(publicError)return json(502,{error:'Could not remove the public file; deletion incomplete'})
     const {error:stagingError}=await ctx.supabaseAdmin.storage.from('nb-media-staging').remove([path])
     if(stagingError)return json(502,{error:'Could not remove the original file; deletion incomplete'})
     const {error:recordError}=await ctx.supabaseAdmin.from('nb_media').delete().eq('id',id)
