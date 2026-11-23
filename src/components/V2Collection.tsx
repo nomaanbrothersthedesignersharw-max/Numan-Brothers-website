@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, ArrowUpRight, Bookmark, MapPin, SlidersHorizontal } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Bookmark, MapPin, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { CatalogProduct, productImage, productPath, productsForCollection } from '../storefront/catalog';
 import { CollectionRoute, getDepartment, getRelatedCollectionLinks } from '../storefront/navigation';
 import { toggleShortlistItem, useShortlist } from '../storefront/shortlist';
@@ -66,42 +66,73 @@ export default function V2Collection({ route, products, bannerImage, totalCount,
     .map(item=>({...item,label:categories.find(c=>c.path===item.path)?.label||item.label}));
   const matches = productsForCollection(products, route.path);
   return <div className="min-h-[70vh] bg-[#fbf8f2] pb-24">
-    <section data-nb-contact-hero className="relative isolate overflow-hidden bg-[#2b241e] px-5 py-20 text-[#f7edde] md:px-12 md:py-28 lg:px-20">
+    <section data-nb-contact-hero className="relative isolate overflow-hidden bg-gradient-to-b from-[#181310] via-[#241c17] to-[#1a1410] px-5 py-20 text-[#f7edde] md:px-12 md:py-28 lg:px-20 min-h-[460px] md:min-h-[520px] flex flex-col justify-center">
       {bannerImage && <img src={bannerImage} alt="" aria-hidden="true" loading="eager" decoding="async"
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-35 blur-[36px] saturate-75 md:blur-[54px]"/>}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#261b16]/95 via-[#271e18]/85 to-[#271e18]/60" aria-hidden="true"/>
-      <div className="pointer-events-none absolute -right-24 -top-32 h-[510px] w-[510px] rounded-full border border-[#a28a6c]/20 bg-[radial-gradient(circle_at_center,#65513c,transparent_66%)]" aria-hidden="true"/>
-      <div className="relative mx-auto max-w-[1330px]">
-        <nav aria-label="Breadcrumb" className="mb-11 flex flex-wrap gap-2 text-[11px] uppercase tracking-[.15em] text-[#c6b59b]">
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-30 blur-[36px] saturate-75 md:blur-[54px]"/>}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#1b140f]/95 via-[#231b15]/85 to-[#1c1511]/70" aria-hidden="true"/>
+      <div className="pointer-events-none absolute -right-20 -top-24 h-[560px] w-[560px] rounded-full border border-[#d4af37]/15 bg-[radial-gradient(circle_at_center,#65513c33,transparent_70%)]" aria-hidden="true"/>
+      <div className="pointer-events-none absolute -left-20 bottom-0 h-[400px] w-[400px] rounded-full border border-[#d4af37]/10" aria-hidden="true"/>
+      <div className="relative mx-auto w-full max-w-[1330px]">
+        <nav aria-label="Breadcrumb" className="mb-8 flex flex-wrap gap-2 text-[11px] uppercase tracking-[.15em] text-[#c6b59b]">
           <V2Link href="/" onNavigate={onNavigate}>{siteText(home,'collection.breadcrumb')}</V2Link><span aria-hidden="true">/</span>
           {route.isDepartment ? <span aria-current="page">{department.title}</span> : <>
             <V2Link href={department.path} onNavigate={onNavigate}>{department.title}</V2Link><span aria-hidden="true">/</span><span aria-current="page">{route.title}</span>
           </>}
         </nav>
-        <p className="mb-6 text-[10px] font-semibold uppercase tracking-[.28em] text-[#ddb98b]">{siteText(home,'collection.eyebrow')} / {department.title}</p>
-        <h1 className="max-w-[850px] font-serif break-words text-[clamp(2.65rem,8vw,7.4rem)] leading-[1] tracking-[-.06em]">{route.title}</h1>
-        <p className="mt-7 max-w-xl text-sm leading-8 text-[#e0d2c1]">{route.description}</p>
-         <div className="mt-8 rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-md sm:inline-block">
-           <ShareCatalogue title={route.title} path={route.path} compact dark/>
-         </div>
-         <p className="mt-3 max-w-lg text-xs leading-6 text-[#e5d0b2]">Share this catalogue to browse all published garments and photographs, including later pages.</p>
+        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#d4af37]/30 bg-[#d4af37]/10 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#e8cda7] backdrop-blur-sm">
+          <Sparkles size={13} className="text-[#d4af37]" /> {siteText(home,'collection.eyebrow')} · {department.title}
+        </div>
+        <h1 className="max-w-[950px] font-serif break-words text-[clamp(2.75rem,7.5vw,6.5rem)] leading-[1.02] tracking-[-.04em] text-[#faf3ea]">
+          {route.isDepartment && route.department === 'men' ? "Men's Haute Couture & Ceremonial Wear" : route.title}
+        </h1>
+        <p className="mt-6 max-w-2xl text-sm leading-8 text-[#e2d5c5] md:text-base">
+          {route.isDepartment && route.department === 'men'
+            ? 'Handcrafted royal sherwanis, bespoke Indo-Westerns, tailored tuxedo suits, and festive wedding ensembles — fitted to perfection at our Warangal showroom.'
+            : route.description}
+        </p>
+        <div className="mt-8 flex flex-wrap gap-2.5 text-xs text-[#d8c7b3] sm:gap-3">
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3.5 py-2 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37]"/> Handcrafted Zardozi &amp; Cutdana
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3.5 py-2 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37]"/> Bespoke Showroom Tailoring
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3.5 py-2 backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37]"/> Warangal Heritage Atelier
+          </span>
+        </div>
       </div>
     </section>
     <div className="mx-auto max-w-[1440px] px-5 pt-12 md:px-12 lg:px-20">
       {links.length > 0 && (
-        <section className="mb-16" aria-label="Related collection categories">
+        <section className="mb-14" aria-label="Explore Collection Categories">
           <div className="mb-7 flex flex-wrap items-center justify-between gap-3 border-b border-[#e2d7c8] pb-4">
-            <h2 className="font-serif text-2xl text-[#2a241e]">{siteText(home,'collection.explore')} {department.title}</h2>
-            <span className="text-[10px] uppercase tracking-[.15em] text-[#9c8059]">{links.length} categories</span>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a48255]">Curated Department</p>
+              <h2 className="font-serif text-2xl text-[#2a241e] md:text-3xl">All {department.title} Collections</h2>
+            </div>
+            <span className="text-[11px] uppercase tracking-[.15em] text-[#9c8059]">{links.length} collections</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {links.map((link) => (
-              <V2Link key={link.path} href={link.path} onNavigate={onNavigate}
-                className="inline-flex min-h-11 items-center gap-2 border border-[#ddcfbc] px-4 py-2 text-[12px] font-medium text-[#625342] transition-colors hover:border-[#9b7849] hover:bg-[#f1e7d7]">
-                {link.label}<ArrowUpRight size={13}/>
-              </V2Link>
-            ))}
-          </div>
+          {route.isDepartment ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {links.map((link) => (
+                <V2Link key={link.path} href={link.path} onNavigate={onNavigate}
+                  className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-[#decbb3] bg-gradient-to-b from-[#fbf7f0] to-[#f4ebe0] p-4 text-[#3c2f23] shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[#8f6d43] hover:shadow-md">
+                  <span className="text-xs font-semibold tracking-wide text-[#2e241c] group-hover:text-[#80552b]">{link.label}</span>
+                  <span className="mt-4 inline-flex items-center gap-1 text-[11px] font-medium text-[#8f6d43]">Explore <ArrowUpRight size={13} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"/></span>
+                </V2Link>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {links.map((link) => (
+                <V2Link key={link.path} href={link.path} onNavigate={onNavigate}
+                  className="inline-flex min-h-11 items-center gap-2 border border-[#ddcfbc] px-4 py-2 text-[12px] font-medium text-[#625342] transition-colors hover:border-[#9b7849] hover:bg-[#f1e7d7]">
+                  {link.label}<ArrowUpRight size={13}/>
+                </V2Link>
+              ))}
+            </div>
+          )}
         </section>
       )}
       <div className="mb-9 flex flex-wrap items-end justify-between gap-5 border-b border-[#e2d7c8] pb-5">

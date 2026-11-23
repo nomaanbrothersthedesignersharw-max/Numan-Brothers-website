@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, ChevronLeft, ChevronRight, MapPin, MessageCircle, Play, Sparkles, Star, Phone, Scissors, X, ZoomIn } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, ChevronLeft, ChevronRight, MessageCircle, Play, ShoppingBag, Sparkles, Star, Scissors, X, ZoomIn } from 'lucide-react';
 import type { Product } from '../types';
 import { productImage, productPath, type CatalogProduct } from '../storefront/catalog';
 import { toggleShortlistItem, useShortlist } from '../storefront/shortlist';
 import {loadRelatedProducts} from '../lib/catalogQueries';
 import { getCmsClient } from '../lib/supabaseClient';
-import {callingContact,whatsappContact} from '../lib/contactLinks';
-import ShareCatalogue from './ShareCatalogue';
+import { callingContact, whatsappContact } from '../lib/contactLinks';
 import { getRelatedCollectionLinks } from '../storefront/navigation';
 import { productTheme } from '../storefront/productTheme';
 import V2Link from './V2Link';
@@ -132,16 +131,27 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
     if (error) setRevStatus(error.code === '23505' ? 'This review has already been submitted.' : 'Unable to submit. Please try again.');
     else { setRevName(''); setRevComment(''); setRevRating(5); setRevStatus('Submitted for moderation. Your star review will appear once approved.'); }
   };
-  const call=callingContact(contactPhone);
+  const call = callingContact(contactPhone);
   const original=garment.originalPrice??null;
   const discounted=garment.offerPrice!=null&&original!=null&&garment.offerPrice<original?garment.offerPrice:null;
   const price=(n:number)=>n.toLocaleString('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0});
   const sizeNote=selectedSize?' Requested size: '+selectedSize+'.':'';
-  const customizationContact=whatsappContact(whatsappNumber,
-    'Hello Nomaan Brothers, I would like to customize '+product.title+' with fabric and measurements.'+sizeNote);
-  const contact=whatsappContact(whatsappNumber,
-    'Hello Nomaan Brothers, I would like to enquire about '+product.title+
-    ' (SKU '+(garment.sku||product.id)+').'+sizeNote);
+  const fullProductUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${productPath(garment)}`
+    : `https://numanbrothers.com${productPath(garment)}`;
+
+  const customizationContact = whatsappContact(
+    whatsappNumber,
+    `Hello Nomaan Brothers, I would like to customize ${product.title} (Style Reference: ${garment.sku || product.id}) with bespoke fabric and measurements.\n\nProduct Link: ${fullProductUrl}${sizeNote}`
+  );
+  const contact = whatsappContact(
+    whatsappNumber,
+    `Hello Nomaan Brothers, I would like to inquire about ${product.title} (Style Reference: ${garment.sku || product.id}).\n\nProduct Link: ${fullProductUrl}${sizeNote}`
+  );
+  const orderContact = whatsappContact(
+    whatsappNumber,
+    `Hello Nomaan Brothers, I would like to order ${product.title} (Style Reference: ${garment.sku || product.id}).\n\nProduct Link: ${fullProductUrl}${sizeNote}`
+  );
   const share=async()=>{
     const link=window.location.origin+productPath(garment);
     if(navigator.share){
@@ -278,10 +288,6 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
                 </div>
               </div>
               <p role="status" aria-live="polite" className="text-xs text-[#78624b]">{shareStatus}</p>
-              <div className="mt-3">
-                <ShareCatalogue title={product.title} path={productPath(garment)} photos={images} compact/>
-                <p className="mt-2 text-xs leading-5 text-[#816c52]">The WhatsApp link includes the garment gallery and up to four approved photo links. Photos are not automatically attached as files.</p>
-              </div>
               <div className="mt-7 h-px w-full bg-[#dfd3c3]"/>
               <p className="mt-7 text-sm leading-8 text-[#5c5147]">
                 {product.description?.trim() || 'Discover the details of this occasionwear design, thoughtfully selected for the collection.'}
@@ -316,19 +322,26 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
               <dl className="mt-8 space-y-4 border-y border-[#dfd3c3] py-6 text-sm">
                 {product.fabric && <div className="flex flex-wrap justify-between gap-4"><dt className="text-[#857565]">Fabric</dt><dd className="max-w-[65%] text-right font-medium text-[#362b21]">{product.fabric}</dd></div>}
                 {Array.isArray(product.sizes) && product.sizes.length > 0 && <div className="flex flex-wrap justify-between gap-4"><dt className="text-[#857565]">Sizing</dt><dd className="max-w-[65%] text-right font-medium text-[#362b21]">Confirm fit in store</dd></div>}
-                <div className="flex flex-wrap justify-between gap-4"><dt className="text-[#857565]">Style reference</dt><dd className="max-w-[65%] break-all text-right font-medium text-[#362b21]">{garment.sku||product.id}</dd></div>
+                <div className="flex flex-wrap justify-between gap-4"><dt className="text-[#857565]">Style code</dt><dd className="max-w-[65%] break-all text-right font-medium text-[#362b21]">{garment.sku||product.id}</dd></div>
               </dl>
               <div className="mt-8 space-y-3">
-                {call&&<a href={call} className="flex min-h-12 items-center gap-3 border border-[#baa381] px-6 text-xs font-bold uppercase">
-                  <Phone size={18}/>{siteText(home,'product.callCta')}</a>}
-                {contact && <a href={contact} target="_blank" rel="noopener noreferrer"
-                  className="flex min-h-14 items-center justify-between gap-4 bg-[#30251b] px-6 text-xs font-semibold uppercase tracking-[.12em] text-[#fbf3e8] transition-colors hover:bg-[#765332]">
-                  <span className="inline-flex items-center gap-3"><MessageCircle size={18}/> {siteText(home,'product.enquiry')}</span><ArrowUpRight size={18}/>
-                </a>}
-                <V2Link href="/contact" onNavigate={onNavigate}
-                  className="flex min-h-14 items-center justify-between gap-4 border border-[#b7a080] px-6 text-xs font-semibold uppercase tracking-[.12em] text-[#5b4934] transition-colors hover:bg-[#f1e5d4]">
-                  <span className="inline-flex items-center gap-3"><MapPin size={17}/> {siteText(home,'product.visit')}</span><ArrowUpRight size={18}/>
-                </V2Link>
+                {contact && (
+                  <a href={contact} target="_blank" rel="noopener noreferrer"
+                    className="flex min-h-14 items-center justify-between gap-4 bg-[#30251b] px-6 text-xs font-semibold uppercase tracking-[.14em] text-[#fbf3e8] transition-all hover:bg-[#765332] hover:shadow-md">
+                    <span className="inline-flex items-center gap-3"><MessageCircle size={18}/> Inquire about this design</span><ArrowUpRight size={18}/>
+                  </a>
+                )}
+                {orderContact && (
+                  <a href={orderContact} target="_blank" rel="noopener noreferrer"
+                    className="flex min-h-14 items-center justify-between gap-4 border-2 border-[#30251b] bg-white px-6 text-xs font-semibold uppercase tracking-[.14em] text-[#30251b] transition-all hover:bg-[#30251b] hover:text-[#fbf3e8]">
+                    <span className="inline-flex items-center gap-3"><ShoppingBag size={18}/> Order this product</span><ArrowUpRight size={18}/>
+                  </a>
+                )}
+                {call && (
+                  <p className="pt-2 text-center text-xs text-[#8c7b6c]">
+                    Need phone assistance? <a href={call} className="font-semibold underline hover:text-[#30251b]">{contactPhone}</a>
+                  </p>
+                )}
               </div>
               <p className="mt-6 text-xs leading-6 text-[#918273]">{siteText(home,'product.disclaimer')}</p>
             </div>

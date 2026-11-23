@@ -101,7 +101,12 @@ export default function App() {
   },[path,searchQuery,page,sort,customizableOnly]);
   const activeRoutePage = routeResult?.key===routeKey ? routeResult.data : null;
   const matches = activeRoutePage?.products || [];
-  const product = selectedId===SAMPLE_SHERWANI.slug ? SAMPLE_SHERWANI : selectedId && detail?.id===selectedId ? detail.product : undefined;
+  const memoryProduct = useMemo(() => {
+    if (!selectedId) return undefined;
+    return published.find(p => p.id === selectedId || p.slug === selectedId || p.sku === selectedId)
+      || matches.find(p => p.id === selectedId || p.slug === selectedId || p.sku === selectedId);
+  }, [selectedId, published, matches]);
+  const product = selectedId===SAMPLE_SHERWANI.slug ? SAMPLE_SHERWANI : (selectedId && detail?.id===selectedId ? detail.product : memoryProduct);
   const policyLabels:Record<string,{key:'privacy'|'terms'|'returns';title:string}>={
     '/privacy-policy':{key:'privacy',title:'Privacy Policy'},
     '/terms-and-conditions':{key:'terms',title:'Terms & Conditions'},
@@ -147,7 +152,7 @@ export default function App() {
          customizableOnly={customizableOnly} onCustomizableChange={(v) => { setPage(0); setCustomizableOnly(v); }}
          onNavigate={navigate}/> :
          <CatalogueSkeleton/>) :
-       selectedId && !detail && selectedId!==SAMPLE_SHERWANI.slug ? <CatalogueSkeleton/> :
+       selectedId && !product && selectedId!==SAMPLE_SHERWANI.slug ? <CatalogueSkeleton/> :
        product ? <V2Product key={product.id} product={product} home={siteData.homepage}
          whatsappNumber={siteData.homepage.contactWhatsapp} contactPhone={siteData.homepage.contactPhone} onNavigate={navigate}/> :
        path === '/search' ? <section className="mx-auto min-h-[70vh] min-w-0 max-w-[1360px] px-4 py-16 min-[360px]:px-5 md:px-12">

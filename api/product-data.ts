@@ -2,8 +2,8 @@
  * Edge-cached single-product + related-products JSON endpoint.
  * Serves 1,000–2,000+ concurrent product page views from Vercel's CDN.
  */
-const url = process.env.VITE_SUPABASE_URL?.trim() || '';
-const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || '';
+const url = process.env.VITE_SUPABASE_URL?.trim() || 'https://uinhybkdzevpxnugtvzf.supabase.co';
+const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || 'sb_publishable_h3Bat2XRHgWACqz-kxCdww_NZsSjO_q';
 const baseCols =
   'id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,price,offer_price,customizable,status,sort_rank,created_at,updated_at';
 

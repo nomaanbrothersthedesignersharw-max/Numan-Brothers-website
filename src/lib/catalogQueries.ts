@@ -5,6 +5,12 @@ import { rowToProduct, type CmsProductRow } from './cmsData';
 
 const columns = 'id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,price,offer_price,customizable,status,sort_rank,created_at,updated_at';
 export const PUBLIC_PAGE_SIZE = 24;
+
+const cataloguePageCache = new Map<string, { time: number; data: CataloguePage }>();
+const productDetailCache = new Map<string, { time: number; data: CatalogProduct | null }>();
+const relatedProductsCache = new Map<string, { time: number; data: CatalogProduct[] }>();
+const CACHE_TTL_MS = 60_000;
+
 export interface CataloguePage {
   products: CatalogProduct[];
   count: number;
@@ -28,6 +34,12 @@ export type CatalogueSort = 'featured' | 'price_asc' | 'price_desc' | 'newest';
 export async function loadCataloguePage(
   opts:{route?:string;query?:string;page?:number;customizable?:boolean;fabric?:string;sort?:CatalogueSort}
 ):Promise<CataloguePage> {
+  const cacheKey = JSON.stringify(opts);
+  const cached = cataloguePageCache.get(cacheKey);
+  if (cached && Date.now() - cached.time < CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const client=getCmsClient();
   const page=Math.max(0,Math.min(100000,Math.floor(opts.page||0)));
   if(!client)return empty(page,'CMS not configured');
@@ -36,6 +48,16 @@ export async function loadCataloguePage(
   const fabricFilter=safeCatalogueSearch(opts.fabric||'');
   const categories=opts.route && opts.route!=='/men' && opts.route!=='/kids' ? collectionFilterPaths(opts.route) : [];
   if(opts.route && opts.route!=='/men' && opts.route!=='/kids' && !categories.length)return empty(page,null);
+
+  const remember = (res: CataloguePage): CataloguePage => {
+    cataloguePageCache.set(cacheKey, { time: Date.now(), data: res });
+    for (const p of res.products) {
+      if (p.id) productDetailCache.set(p.id, { time: Date.now(), data: p });
+      if (p.sku) productDetailCache.set(p.sku, { time: Date.now(), data: p });
+      if (p.slug) productDetailCache.set(p.slug, { time: Date.now(), data: p });
+    }
+    return res;
+  };
 
   if (typeof window !== 'undefined') {
     try {
@@ -50,13 +72,13 @@ export async function loadCataloguePage(
       const edgeRes = await fetch('/api/catalogue?' + sp.toString(), { headers: { Accept: 'application/json' } });
       if (edgeRes.ok && edgeRes.headers.get('content-type')?.includes('application/json')) {
         const payload = (await edgeRes.json()) as { products?: CmsProductRow[]; count?: number; page?: number; pageSize?: number };
-        return {
+        return remember({
           products: (payload.products || []).map(rowToProduct),
           count: payload.count ?? 0,
           page: payload.page ?? page,
           pageSize: payload.pageSize ?? PUBLIC_PAGE_SIZE,
           error: null,
-        };
+        });
       }
     } catch {
       // Fall back to direct Supabase query in local dev
@@ -80,10 +102,10 @@ export async function loadCataloguePage(
   const {data,count,error}=await builder
     .order('id',{ascending:true})
     .range(page*PUBLIC_PAGE_SIZE,(page+1)*PUBLIC_PAGE_SIZE-1);
-  return error?empty(page,error.message):{
+  return error?empty(page,error.message):remember({
     products:((data||[]) as CmsProductRow[]).map(rowToProduct),
     count:count||0,page,pageSize:PUBLIC_PAGE_SIZE,error:null,
-  };
+  });
 }
 const isUuid=(handle:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle);
 const isSku=(handle:string)=>/^NB-[A-Z]{2,3}-[0-9]{5}$/.test(handle);
@@ -93,7 +115,22 @@ export const isValidProductHandle=(handle:string):boolean =>
 /** Publish-only lookup: readable slugs and existing UUID shares both resolve. */
 export async function loadProductById(handle:string):Promise<CatalogProduct|null> {
   if(!isValidProductHandle(handle))return null;
+  const cached = productDetailCache.get(handle);
+  if (cached && Date.now() - cached.time < CACHE_TTL_MS) {
+    return cached.data;
+  }
   const client=getCmsClient();if(!client)return null;
+
+  const rememberProduct = (prod: CatalogProduct | null) => {
+    productDetailCache.set(handle, { time: Date.now(), data: prod });
+    if (prod) {
+      if (prod.id) productDetailCache.set(prod.id, { time: Date.now(), data: prod });
+      if (prod.sku) productDetailCache.set(prod.sku, { time: Date.now(), data: prod });
+      if (prod.slug) productDetailCache.set(prod.slug, { time: Date.now(), data: prod });
+    }
+    return prod;
+  };
+
   if (typeof window !== 'undefined') {
     try {
       const edgeRes = await fetch('/api/product-data?id=' + encodeURIComponent(handle), {
@@ -101,10 +138,10 @@ export async function loadProductById(handle:string):Promise<CatalogProduct|null
       });
       if (edgeRes.ok && edgeRes.headers.get('content-type')?.includes('application/json')) {
         const payload = (await edgeRes.json()) as { product?: CmsProductRow | null };
-        return payload.product ? rowToProduct(payload.product) : null;
+        return rememberProduct(payload.product ? rowToProduct(payload.product) : null);
       }
       if (edgeRes.status === 404 && edgeRes.headers.get('content-type')?.includes('application/json')) {
-        return null;
+        return rememberProduct(null);
       }
     } catch {
       // Fall back to direct Supabase query in local dev
@@ -112,14 +149,18 @@ export async function loadProductById(handle:string):Promise<CatalogProduct|null
   }
   const {data,error}=await client.from('nb_products').select(columns)
     .eq('status','published').eq(isUuid(handle)?'id':isSku(handle)?'sku':'slug',handle).maybeSingle();
-  if(error||!data)return null;
-  return rowToProduct(data as CmsProductRow);
+  if(error||!data)return rememberProduct(null);
+  return rememberProduct(rowToProduct(data as CmsProductRow));
 }
 /** Bounded indexed collection recommendations; never expose draft or archived garments. */
 export async function loadRelatedProducts(product:CatalogProduct,limit=4):Promise<CatalogProduct[]> {
   const route=product.collectionPaths?.[0];
   const client=getCmsClient();
   if(!client||!route)return [];
+  const cached = relatedProductsCache.get(product.id);
+  if (cached && Date.now() - cached.time < CACHE_TTL_MS) {
+    return cached.data;
+  }
   const count=Math.min(6,Math.max(1,Math.floor(limit)));
   if (typeof window !== 'undefined') {
     try {
@@ -129,7 +170,11 @@ export async function loadRelatedProducts(product:CatalogProduct,limit=4):Promis
       });
       if (edgeRes.ok && edgeRes.headers.get('content-type')?.includes('application/json')) {
         const payload = (await edgeRes.json()) as { related?: CmsProductRow[] };
-        if (Array.isArray(payload.related)) return payload.related.slice(0, count).map(rowToProduct);
+        if (Array.isArray(payload.related)) {
+          const list = payload.related.slice(0, count).map(rowToProduct);
+          relatedProductsCache.set(product.id, { time: Date.now(), data: list });
+          return list;
+        }
       }
     } catch {
       // Fall back to direct Supabase query in local dev
@@ -139,5 +184,7 @@ export async function loadRelatedProducts(product:CatalogProduct,limit=4):Promis
     .eq('status','published').neq('id',product.id)
     .overlaps('category_paths',[route])
     .order('updated_at',{ascending:false}).limit(count);
-  return error?[]:((data||[]) as CmsProductRow[]).map(rowToProduct);
+  const list = error?[]:((data||[]) as CmsProductRow[]).map(rowToProduct);
+  relatedProductsCache.set(product.id, { time: Date.now(), data: list });
+  return list;
 }
