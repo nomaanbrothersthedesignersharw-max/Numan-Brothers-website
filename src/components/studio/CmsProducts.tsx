@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ArrowLeft, ArrowRight, Plus, Save, Send, Archive, Trash2 } from 'lucide-react';
-import { type CmsProductRow, isSafeHttps } from '../../lib/cmsData';
+import { type CmsProductRow, isSafeHttps, mediaPublicUrl } from '../../lib/cmsData';
 import { COLLECTION_ROUTES } from '../../storefront/navigation';
 import { productPath } from '../../storefront/catalog';
 import AssetEditor from './AssetEditor';
-import {ErrorText,Field,inputClass,outlineClass,primaryClass} from './StudioShared';
+import {ErrorText,Field,inputClass,outlineClass,primaryClass,invokeMediaAction} from './StudioShared';
 
 interface Props {client:SupabaseClient;userId:string;canPublish:boolean;}
 interface Draft {
@@ -211,6 +211,53 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     else{setId(null);setPublishedSlug(null);setMessage('Product archived and hidden from the live catalogue.');await load();}
     setBusy(false);
   };
+  const deleteProduct=async()=>{
+    if(!id||!canPublish)return;
+    const confirmed=window.confirm(
+      `Permanently DELETE "${form.title||form.sku}" from Supabase?\n\n`+
+      `This removes the product, drafts, revisions, and associations from the database. This action is irreversible.`
+    );
+    if(!confirmed)return;
+
+    const alsoDeleteImages=form.imageUrls.length>0&&window.confirm(
+      `Do you also want to permanently delete this product's ${form.imageUrls.length} image(s) from Supabase Storage?`
+    );
+
+    setBusy(true);setError(null);setMessage(null);
+    try{
+      const {error:rpcError}=await client.rpc('nb_delete_product',{p_product_id:id});
+      if(rpcError){
+        await client.from('nb_product_drafts').delete().eq('product_id',id);
+        const {error:fallbackError}=await client.from('nb_products').delete().eq('id',id);
+        if(fallbackError)throw new Error(rpcError.message||fallbackError.message);
+      }
+
+      if(alsoDeleteImages){
+        for(const imgUrl of form.imageUrls){
+          try{
+            const prefix=mediaPublicUrl('');
+            if(prefix&&imgUrl.startsWith(prefix)){
+              const storagePath=decodeURIComponent(imgUrl.slice(prefix.length)).replace(/^\/+/,'');
+              const {data:asset}=await client.from('nb_media').select('id').eq('storage_path',storagePath).maybeSingle();
+              if(asset?.id){
+                await invokeMediaAction(client,asset.id as string,'delete');
+              }
+            }
+          }catch{
+            // best-effort cleanup
+          }
+        }
+      }
+
+      setId(null);setPublishedSlug(null);setForm({...blank});
+      setMessage(`Product "${form.title||form.sku}" permanently deleted from Supabase.`);
+      await load();
+    }catch(e){
+      setError(e instanceof Error?e.message:'Failed to delete product.');
+    }finally{
+      setBusy(false);
+    }
+  };
   return <section className="space-y-7">
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><h2 className="font-serif text-3xl">Products</h2><p className="mt-2 text-sm text-stone-600">Create and edit private drafts; approved owners publish changes atomically.</p></div>
@@ -361,6 +408,7 @@ export default function CmsProducts({client,userId,canPublish}:Props){
             {canPublish&&<button type="button" className={primaryClass} disabled={busy||skuLoading} onClick={()=>void publish()}><Send size={15}/> {publishedSlug?'Update published product':'Publish product'}</button>}
             <button type="button" className={outlineClass} disabled={busy} onClick={()=>void discardDraft()}><Trash2 size={15}/> Discard private draft</button>
             {canPublish&&active?.live&&<button type="button" className={outlineClass+' border-amber-400 text-amber-900'} disabled={busy} onClick={()=>void archiveProduct()}><Archive size={15}/> Archive garment</button>}
+            {canPublish&&id&&<button type="button" className={outlineClass+' border-red-300 text-red-800 hover:bg-red-50'} disabled={busy} onClick={()=>void deleteProduct()}><Trash2 size={15}/> Delete product from Supabase</button>}
           </div>
           {message&&<p role="status" className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
           <ErrorText message={error}/>
