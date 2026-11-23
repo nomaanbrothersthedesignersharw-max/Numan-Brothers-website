@@ -3,15 +3,22 @@ import type {SupabaseClient} from '@supabase/supabase-js';
 import {Check,X} from 'lucide-react';
 import {outlineClass,ErrorText} from './StudioShared';
 type Review={id:string;display_name:string;rating:number;comment:string;source:string;
- status:'pending'|'approved'|'rejected';created_at:string};
+ status:'pending'|'approved'|'rejected';created_at:string;product_id?:string|null};
 export default function CmsReviews({client,canPublish}:{client:SupabaseClient;canPublish:boolean}){
  const [rows,setRows]=useState<Review[]>([]);
  const [busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
  const [message,setMessage]=useState('');
  const load=async()=>{
-   const {data,error}=await client.from('nb_reviews')
-     .select('id,display_name,rating,comment,source,status,created_at')
+   let {data,error}=await client.from('nb_reviews')
+     .select('id,display_name,rating,comment,source,status,created_at,product_id')
      .order('created_at',{ascending:false}).limit(100);
+   if(error){
+     const fallback=await client.from('nb_reviews')
+       .select('id,display_name,rating,comment,source,status,created_at')
+       .order('created_at',{ascending:false}).limit(100);
+     data=fallback.data as typeof data;
+     error=fallback.error;
+   }
    if(error)setError(error.message);else{setRows((data||[]) as Review[]);setError(null);}
  };
  useEffect(()=>{void load();},[client]);
@@ -40,7 +47,7 @@ export default function CmsReviews({client,canPublish}:{client:SupabaseClient;ca
            <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold">{item.status}</span>
          </div>
          <p className="whitespace-pre-line break-words text-sm leading-7">{item.comment}</p>
-         <p className="text-xs text-stone-500">{new Date(item.created_at).toLocaleDateString('en-IN')} · {item.source}</p>
+         <p className="text-xs text-stone-500">{new Date(item.created_at).toLocaleDateString('en-IN')} · {item.source} · {item.product_id ? 'Product review' : 'Storefront review'}</p>
          {canPublish&&<div className="flex flex-wrap gap-2 border-t pt-3">
            {item.status!=='approved'&&<button type="button" disabled={busy} className={outlineClass}
              onClick={()=>void moderate(item.id,'approved')}><Check size={16}/> Approve</button>}

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, ChevronLeft, ChevronRight, MapPin, MessageCircle, Sparkles, Phone, Scissors, X, ZoomIn } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, ChevronLeft, ChevronRight, MapPin, MessageCircle, Play, Sparkles, Star, Phone, Scissors, X, ZoomIn } from 'lucide-react';
 import type { Product } from '../types';
 import { productImage, productPath, type CatalogProduct } from '../storefront/catalog';
 import { toggleShortlistItem, useShortlist } from '../storefront/shortlist';
 import {loadRelatedProducts} from '../lib/catalogQueries';
+import { getCmsClient } from '../lib/supabaseClient';
 import {callingContact,whatsappContact} from '../lib/contactLinks';
 import ShareCatalogue from './ShareCatalogue';
 import { getRelatedCollectionLinks } from '../storefront/navigation';
@@ -30,6 +31,14 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   const [shareStatus,setShareStatus]=useState('');
   const [related,setRelated]=useState<CatalogProduct[]>([]);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [reviews, setReviews] = useState<{ id: string; display_name: string; rating: number; comment: string; created_at: string }[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [revName, setRevName] = useState('');
+  const [revRating, setRevRating] = useState(5);
+  const [revComment, setRevComment] = useState('');
+  const [revWebsite, setRevWebsite] = useState('');
+  const [revStatus, setRevStatus] = useState('');
+  const [revBusy, setRevBusy] = useState(false);
   const shortlist = useShortlist();
   const isSaved = shortlist.some((item) => item.id === garment.id);
   useEffect(() => {
@@ -44,17 +53,85 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   }, [zoomOpen, images.length]);
   useEffect(()=>{
     let active=true;
-    if(garment.slug!=='sample-plain-sherwani')void loadRelatedProducts(garment,4).then(rows=>{if(active)setRelated(rows)});
+    if(garment.slug!=='sample-plain-sherwani'){
+      void loadRelatedProducts(garment,4).then(rows=>{if(active)setRelated(rows)});
+      const loadRevs=async()=>{
+        try{
+          const res=await fetch('/api/reviews?productId='+encodeURIComponent(garment.id),{headers:{Accept:'application/json'}});
+          if(res.ok&&res.headers.get('content-type')?.includes('application/json')){
+            const payload=await res.json() as {reviews?:typeof reviews;averageRating?:number};
+            if(active&&Array.isArray(payload.reviews)){
+              setReviews(payload.reviews);setAvgRating(payload.averageRating||0);return;
+            }
+          }
+        }catch{/**/}
+        const client=getCmsClient();
+        if(!client)return;
+        const {data,error}=await client.from('nb_reviews').select('id,display_name,rating,comment,created_at')
+          .eq('status','approved').eq('product_id',garment.id).order('approved_at',{ascending:false}).limit(12);
+        if(active&&!error&&Array.isArray(data)){
+          const list=data as typeof reviews;
+          setReviews(list);
+          setAvgRating(list.length?Number((list.reduce((s,r)=>s+r.rating,0)/list.length).toFixed(1)):0);
+        }
+      };
+      void loadRevs();
+    }
     return()=>{active=false};
   },[garment.id]);
+  useEffect(() => {
+    if (typeof window === 'undefined' || images.length < 2) return;
+    const nextIdx = (selectedImage + 1) % images.length;
+    const img = new window.Image();
+    img.src = optimizedImageUrl(images[nextIdx], 1200, 85);
+  }, [selectedImage, images]);
   const visual = images[selectedImage] || productImage(product);
   const siblings = getRelatedCollectionLinks(theme.collectionPath)
     .filter(link => link.path !== theme.collectionPath).slice(0, 5);
   const videoList = (garment.videoUrls?.length ? garment.videoUrls : (garment.videoUrl ? [garment.videoUrl] : []))
     .filter((u) => typeof u === 'string' && /^https:\/\//i.test(u));
+  const gallerySlides: { kind: 'image' | 'video'; url: string }[] = [
+    ...images.map((url) => ({ kind: 'image' as const, url })),
+    ...videoList.map((url) => ({ kind: 'video' as const, url })),
+  ];
+  const activeSlide = gallerySlides[selectedImage] || gallerySlides[0];
   const videoUrl = videoList[selectedVideo] || videoList[0];
   const playableVideo = typeof videoUrl === 'string' && /^https:\/\//i.test(videoUrl) &&
     (/\.(mp4|webm)(\?|$)/i.test(videoUrl) || videoUrl.includes('/storage/v1/object/public/nb-media-public/'));
+  const submitProductReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (revWebsite) { setRevStatus('Thank you.'); return; }
+    if (revName.trim().length < 2 || revName.trim().length > 70 || revComment.trim().length < 20 || revComment.trim().length > 1200) {
+      setRevStatus('Enter your name and a review of at least 20 characters.'); return;
+    }
+    setRevBusy(true); setRevStatus('');
+    try {
+      const res = await fetch('/api/submit-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ display_name: revName.trim(), rating: revRating, comment: revComment.trim(), product_id: garment.id, website: revWebsite }),
+      });
+      if (res.status !== 404) {
+        const d = await res.json().catch(() => ({})) as { error?: string; code?: string };
+        setRevBusy(false);
+        if (!res.ok) {
+          setRevStatus(res.status === 409 || d.code === '23505' ? 'This review has already been submitted.' : (d.error || 'Unable to submit.'));
+          return;
+        }
+        setRevName(''); setRevComment(''); setRevRating(5);
+        setRevStatus('Submitted for moderation. Your star review will appear once approved.');
+        return;
+      }
+    } catch {/**/}
+    const client = getCmsClient();
+    if (!client) { setRevBusy(false); setRevStatus('Review submissions are currently unavailable.'); return; }
+    const { error } = await client.from('nb_reviews').insert({
+      display_name: revName.trim(), rating: revRating, comment: revComment.trim(), product_id: garment.id,
+    });
+    setRevBusy(false);
+    if (error) setRevStatus(error.code === '23505' ? 'This review has already been submitted.' : 'Unable to submit. Please try again.');
+    else { setRevName(''); setRevComment(''); setRevRating(5); setRevStatus('Submitted for moderation. Your star review will appear once approved.'); }
+  };
   const call=callingContact(contactPhone);
   const original=garment.originalPrice??null;
   const discounted=garment.offerPrice!=null&&original!=null&&garment.offerPrice<original?garment.offerPrice:null;
@@ -83,10 +160,8 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   return <div className="min-h-[72vh] bg-[#fbf8f2] pb-24 lg:pb-0">
     <section data-nb-contact-hero className="relative isolate overflow-hidden pb-20 pt-7 md:pb-28 md:pt-11" style={{ backgroundColor: theme.backdrop }}>
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        {visual && <img key={visual} src={visual} alt="" loading="eager" decoding="async"
-          className="absolute inset-[-12%] h-[124%] w-[124%] object-cover object-center opacity-55 blur-[68px] saturate-[.72] motion-safe:animate-[nb-ambient-arrival_850ms_ease-out_both] md:blur-[95px]"/>}
-        <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at 15% 8%, ${theme.glow}88 0%, transparent 57%)` }}/>
-        <div className="absolute inset-0 bg-gradient-to-br from-[#100e0d]/75 via-[#201b18]/70 to-[#17120f]/90"/>
+        <div className="absolute inset-0 transform-gpu blur-[68px]" style={{ background: `radial-gradient(ellipse at 18% 12%, ${theme.glow}99 0%, transparent 58%), radial-gradient(ellipse at 85% 75%, ${theme.accent}44 0%, transparent 60%)` }}/>
+        <div className="absolute inset-0 bg-gradient-to-br from-[#100e0d]/70 via-[#201b18]/65 to-[#17120f]/90"/>
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#1c1714]/75 to-transparent"/>
         <div className="absolute -right-44 -top-56 h-[520px] w-[520px] rounded-full border border-white/10 md:h-[800px] md:w-[800px]"/>
         <div className="absolute -right-14 -top-24 h-[320px] w-[320px] rounded-full border border-white/10 md:h-[580px] md:w-[580px]"/>
@@ -108,38 +183,48 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
             <div className="relative mx-auto max-w-[700px]">
               <div className="absolute -left-3 -top-3 h-32 w-32 border-l border-t border-white/45 md:-left-5 md:-top-5" aria-hidden="true"/>
               <div className="group relative aspect-[3/4] overflow-hidden border border-white/20 bg-[#dbcbb4]/20 shadow-[0_30px_85px_-26px_rgba(0,0,0,.65)]">
-                {visual ? <img src={optimizedImageUrl(visual, 1200, 85)} alt={product.title}
+                {activeSlide?.kind === 'video' ? (
+                  <video key={activeSlide.url} src={activeSlide.url} controls autoPlay muted loop playsInline poster={images[0] ? optimizedImageUrl(images[0], 1200, 80) : undefined}
+                    className="h-full w-full bg-[#16110e] object-cover" aria-label={'Brand film of ' + product.title}/>
+                ) : visual ? <img key={visual} src={optimizedImageUrl(visual, 1200, 85)} alt={product.title}
                   loading="eager" fetchPriority="high" decoding="async"
                   onClick={() => setZoomOpen(true)}
-                  className="h-full w-full cursor-zoom-in object-cover object-top motion-safe:transition-transform motion-safe:duration-700 motion-safe:group-hover:scale-[1.025]"/> :
+                  className="h-full w-full cursor-zoom-in object-cover object-top transition-opacity duration-300 motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-[1.02]"/> :
                   <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#765d4c] via-[#3c302a] to-[#21191a]">
                     <span className="font-serif text-5xl italic text-[#ead5b3]/65 md:text-7xl">Nomaan</span>
                   </div>}
                 <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/40 to-transparent px-5 py-5 text-[10px] font-semibold uppercase tracking-[.2em] text-white">
                   <span>{siteText(home,'product.brand')}</span>
                   <div className="flex items-center gap-3">
-                    {images.length > 0 && <span>{String(selectedImage + 1).padStart(2,'0')} / {String(images.length).padStart(2,'0')}</span>}
-                    {visual && <button type="button" onClick={() => setZoomOpen(true)} aria-label="Zoom garment photograph" className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-black/40 text-white hover:bg-black/70"><ZoomIn size={15}/></button>}
+                    {gallerySlides.length > 0 && <span>{String(selectedImage + 1).padStart(2,'0')} / {String(gallerySlides.length).padStart(2,'0')}</span>}
+                    {activeSlide?.kind !== 'video' && visual && <button type="button" onClick={() => setZoomOpen(true)} aria-label="Zoom garment photograph" className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-black/40 text-white transition-transform hover:bg-black/70 active:scale-95"><ZoomIn size={15}/></button>}
                   </div>
                 </div>
-                {images.length > 1 && <div className="absolute inset-x-4 bottom-4 flex justify-between gap-3">
-                  <button type="button" onClick={() => setSelectedImage(current => (current + images.length - 1) % images.length)}
-                    aria-label="Previous garment photograph" className="flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-[#241b16]/65 text-white backdrop-blur-md transition-colors hover:bg-[#241b16]/90">
+                {gallerySlides.length > 1 && <div className="pointer-events-none absolute inset-x-4 bottom-4 flex justify-between gap-3">
+                  <button type="button" onClick={() => setSelectedImage(current => (current + gallerySlides.length - 1) % gallerySlides.length)}
+                    aria-label="Previous garment media" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-[#241b16]/75 text-white backdrop-blur-sm transition-all hover:bg-[#241b16] active:scale-95">
                     <ChevronLeft size={21}/>
                   </button>
-                  <button type="button" onClick={() => setSelectedImage(current => (current + 1) % images.length)}
-                    aria-label="Next garment photograph" className="flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-[#241b16]/65 text-white backdrop-blur-md transition-colors hover:bg-[#241b16]/90">
+                  <button type="button" onClick={() => setSelectedImage(current => (current + 1) % gallerySlides.length)}
+                    aria-label="Next garment media" className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/40 bg-[#241b16]/75 text-white backdrop-blur-sm transition-all hover:bg-[#241b16] active:scale-95">
                     <ChevronRight size={21}/>
                   </button>
                 </div>}
               </div>
-              {images.length > 1 && <div className="mt-4 flex gap-3 overflow-x-auto pb-3" role="group" aria-label="Choose product image">
-                {images.map((image, index) => <button key={image + index} type="button"
-                  aria-label={`View photograph ${index + 1} of ${images.length}`} aria-pressed={selectedImage === index}
+              {gallerySlides.length > 1 && <div className="mt-4 flex gap-3 overflow-x-auto pb-3" role="group" aria-label="Choose product media">
+                {gallerySlides.map((slide, index) => <button key={slide.url + index} type="button"
+                  aria-label={slide.kind === 'video' ? 'Play garment brand film' : `View photograph ${index + 1} of ${images.length}`} aria-pressed={selectedImage === index}
                   onClick={() => setSelectedImage(index)}
-                  className={'relative h-20 w-[68px] shrink-0 overflow-hidden border-2 bg-[#a68e75]/30 transition-colors md:h-24 md:w-20 ' +
+                  className={'relative h-20 w-[68px] shrink-0 overflow-hidden border-2 bg-[#231b15] transition-all active:scale-95 md:h-24 md:w-20 ' +
                     (selectedImage === index ? 'border-[#efc995]' : 'border-white/25 hover:border-white/65')}>
-                  <img src={optimizedImageUrl(image, 200, 75)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-top"/>
+                  {slide.kind === 'video' ? (
+                    <div className="relative flex h-full w-full items-center justify-center bg-[#1c1714] text-[#efc995]">
+                      {images[0] && <img src={optimizedImageUrl(images[0], 200, 70)} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45" />}
+                      <span className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full border border-[#efc995]/70 bg-black/60"><Play size={14} className="fill-current"/></span>
+                    </div>
+                  ) : (
+                    <img src={optimizedImageUrl(slide.url, 200, 75)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-top"/>
+                  )}
                   {selectedImage === index && <span className="absolute inset-x-1 bottom-1 h-[2px] bg-[#efc995]" aria-hidden="true"/>}
                 </button>)}
               </div>}
@@ -166,12 +251,19 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
             </div>
           </V2Reveal>
           <V2Reveal delay={0.12} className="lg:sticky lg:top-32 lg:self-start">
-            <div className="min-w-0 border border-[#fff9ed]/60 bg-[#fcf8f0]/95 px-4 py-7 shadow-[0_28px_90px_-30px_rgba(0,0,0,.5)] backdrop-blur-xl min-[360px]:px-6 min-[360px]:py-9 sm:px-9 sm:py-12 xl:px-12">
+            <div className="min-w-0 border border-[#fff9ed]/60 bg-[#fcf8f0]/[0.97] px-4 py-7 shadow-[0_28px_90px_-30px_rgba(0,0,0,.5)] backdrop-blur-md min-[360px]:px-6 min-[360px]:py-9 sm:px-9 sm:py-12 xl:px-12">
               <p className="mb-6 flex items-center gap-3 text-[10px] font-bold uppercase tracking-[.22em] text-[#85623d]">
                 <span className="h-px w-8" style={{ backgroundColor: theme.accent }}/>{theme.name}
               </p>
               <h1 className="font-serif break-words text-[clamp(2.3rem,4.5vw,5.3rem)] leading-[1.04] tracking-[-.055em] text-[#251d18]">{product.title}</h1>
-              <p className="mt-4 text-[11px] font-medium uppercase tracking-[.15em] text-[#8b745b]">{theme.collectionLabel} / Nomaan Brothers</p>
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <p className="text-[11px] font-medium uppercase tracking-[.15em] text-[#8b745b]">{theme.collectionLabel} / Nomaan Brothers</p>
+                {reviews.length > 0 && (
+                  <a href="#product-reviews" className="inline-flex items-center gap-1.5 rounded-full border border-[#dfd0bc] bg-[#f6efe3] px-3 py-1 text-xs font-semibold text-[#5a4227]">
+                    <Star size={13} className="fill-[#af8251] text-[#af8251]" /> {avgRating.toFixed(1)} · {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+                  </a>
+                )}
+              </div>
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
                 {garment.sku&&<p className="break-all text-xs font-semibold tracking-[.09em] text-[#8a745b]">Style code · {garment.sku}</p>}
                 <div className="flex flex-wrap items-center gap-4">
@@ -289,6 +381,73 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
         </V2Link>)}
       </div>
     </section>}
+    {garment.slug !== 'sample-plain-sherwani' && (
+      <section id="product-reviews" aria-labelledby="product-reviews-title" className="border-t border-[#e2d4c0] bg-[#f4ece0] px-5 py-16 md:px-12 md:py-20 lg:px-20">
+        <div className="mx-auto max-w-[1330px]">
+          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#d6c5ae] pb-6">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[.22em] text-[#95714a]">Verified garment feedback</p>
+              <h2 id="product-reviews-title" className="mt-2 font-serif text-[clamp(1.9rem,4vw,3rem)] text-[#2a211a]">
+                Customer Reviews {reviews.length > 0 ? `(${avgRating.toFixed(1)} ★)` : ''}
+              </h2>
+            </div>
+            {reviews.length > 0 && (
+              <div className="flex items-center gap-1.5" aria-label={`Rated ${avgRating} out of 5`}>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <Star key={i} size={18} className={i < Math.round(avgRating) ? 'fill-[#af8251] text-[#af8251]' : 'text-stone-300'} />
+                ))}
+                <span className="ml-2 text-xs font-semibold text-[#5a442c]">{reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}</span>
+              </div>
+            )}
+          </div>
+          {reviews.length > 0 ? (
+            <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {reviews.map((item) => (
+                <blockquote key={item.id} className="rounded-xl border border-[#e2d2bd] bg-white p-6">
+                  <div className="flex gap-1" aria-label={`${item.rating} out of 5 stars`}>
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <Star key={i} size={15} className={i < item.rating ? 'fill-[#af8251] text-[#af8251]' : 'text-stone-300'} />
+                    ))}
+                  </div>
+                  <p className="mt-4 whitespace-pre-line break-words text-sm leading-7 text-[#3b3026]">“{item.comment}”</p>
+                  <footer className="mt-5 border-t border-stone-200 pt-3 text-xs font-semibold text-[#6b5640]">{item.display_name}</footer>
+                </blockquote>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-8 rounded-xl border border-dashed border-[#c2ab8c] bg-[#faf5ed] p-6 text-sm text-[#6b5a47]">
+              No reviews published for this garment yet. Share your showroom experience below.
+            </p>
+          )}
+          <form onSubmit={(e) => void submitProductReview(e)} className="mt-10 grid gap-4 rounded-xl border border-[#e2d2bd] bg-white p-5 sm:grid-cols-2 sm:p-7">
+            <label className="text-xs font-semibold">Your name
+              <input required maxLength={70} value={revName} onChange={(e) => setRevName(e.target.value)}
+                className="mt-2 block min-h-11 w-full rounded-md border border-stone-300 px-3 text-base sm:text-sm" />
+            </label>
+            <label className="text-xs font-semibold">Star rating
+              <select value={revRating} onChange={(e) => setRevRating(Number(e.target.value))}
+                className="mt-2 block min-h-11 w-full rounded-md border border-stone-300 bg-white px-3 text-base sm:text-sm">
+                {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} ★ out of 5</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-semibold sm:col-span-2">Your review
+              <textarea required minLength={20} maxLength={1200} rows={3} value={revComment} onChange={(e) => setRevComment(e.target.value)}
+                placeholder="Share fabric feel, fit, and tailoring experience…"
+                className="mt-2 block w-full rounded-md border border-stone-300 p-3 text-base sm:text-sm" />
+            </label>
+            <label className="absolute -left-[10000px]" aria-hidden="true">Website
+              <input tabIndex={-1} autoComplete="off" value={revWebsite} onChange={(e) => setRevWebsite(e.target.value)} />
+            </label>
+            <div className="flex flex-wrap items-center gap-4 sm:col-span-2">
+              <button type="submit" disabled={revBusy} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#2c241c] px-6 text-xs font-semibold uppercase tracking-wider text-white disabled:opacity-60">
+                {revBusy ? 'Submitting…' : 'Submit star review'}
+              </button>
+              <p role="status" aria-live="polite" className="text-xs text-[#6f5841]">{revStatus}</p>
+            </div>
+          </form>
+        </div>
+      </section>
+    )}
     {zoomOpen && visual && (
       <div role="dialog" aria-modal="true" aria-label={product.title + ' enlarged photograph'}
         className="fixed inset-0 z-[95] flex items-center justify-center bg-[#120e0b]/95 p-4 backdrop-blur-md">

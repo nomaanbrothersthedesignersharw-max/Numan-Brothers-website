@@ -82,6 +82,9 @@ export default {
     const displayName = typeof body.display_name === 'string' ? body.display_name.trim() : '';
     const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
     const rating = Number(body.rating);
+    const productId = typeof body.product_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.product_id.trim())
+      ? body.product_id.trim()
+      : null;
     if (
       displayName.length < 2 || displayName.length > 70 ||
       comment.length < 20 || comment.length > 1200 ||
@@ -91,6 +94,8 @@ export default {
     }
 
     try {
+      const payload: Record<string, unknown> = { display_name: displayName, rating, comment };
+      if (productId) payload.product_id = productId;
       const res = await fetch(api + '/rest/v1/nb_reviews', {
         method: 'POST',
         headers: {
@@ -99,7 +104,7 @@ export default {
           'Content-Type': 'application/json',
           Prefer: 'return=minimal',
         },
-        body: JSON.stringify({ display_name: displayName, rating, comment }),
+        body: JSON.stringify(payload),
         signal: AbortSignal.timeout(8000),
       });
       if (res.status === 409) {

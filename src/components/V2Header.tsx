@@ -83,7 +83,7 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
   };
 
   return <>
-    <header ref={wrapper} className="sticky top-0 z-50 border-b border-[#e5ddd1] bg-[#fbf8f2]/95 backdrop-blur-xl">
+    <header ref={wrapper} className="sticky top-0 z-50 border-b border-[#e5ddd1] bg-[#fbf8f2]/95 backdrop-blur-md">
       <div className="border-b border-[#e7dfd1] bg-[#1d1917] px-4 py-2 text-center text-[9px] font-semibold uppercase tracking-[0.22em] text-[#e7d9bf] md:text-[10px]">
         {siteText(home,'nav.announcement')}
       </div>
