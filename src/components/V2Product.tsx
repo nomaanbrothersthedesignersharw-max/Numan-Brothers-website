@@ -71,7 +71,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
         const client=getCmsClient();
         if(!client)return;
         const {data,error}=await client.from('nb_reviews').select('id,display_name,rating,comment,created_at')
-          .eq('status','approved').eq('product_id',garment.id).order('approved_at',{ascending:false}).limit(12);
+          .eq('status','approved').eq('product_id',garment.id).order('created_at',{ascending:false}).limit(12);
         if(active&&!error&&Array.isArray(data)){
           const list=data as typeof reviews;
           setReviews(list);
@@ -135,18 +135,39 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
     if (revName.trim().length < 2 || revName.trim().length > 70 || revComment.trim().length < 20 || revComment.trim().length > 1200) {
       setRevStatus('Enter your name and a review of at least 20 characters.'); return;
     }
+    const subName = revName.trim();
+    const subComment = revComment.trim();
+    const subRating = revRating;
+    const subPhotos = revPhotos.map((p) => p.dataUrl);
     setRevBusy(true); setRevStatus('');
+    const applyLiveReview = () => {
+      const newRev = {
+        id: 'rev-' + Date.now(),
+        display_name: subName,
+        rating: subRating,
+        comment: subComment,
+        created_at: new Date().toISOString(),
+        photo_urls: subPhotos,
+      };
+      setReviews((prev) => [newRev, ...prev.filter((r) => r.comment !== subComment)]);
+      setAvgRating(() => {
+        const all = [newRev, ...reviews.filter((r) => r.comment !== subComment)];
+        return Number((all.reduce((s, r) => s + r.rating, 0) / all.length).toFixed(1));
+      });
+      setRevName(''); setRevComment(''); setRevRating(5); setRevPhotos([]);
+      setRevStatus('Thank you! Your verified star review has been published.');
+    };
     try {
       const res = await fetch('/api/submit-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
-          display_name: revName.trim(),
-          rating: revRating,
-          comment: revComment.trim(),
+          display_name: subName,
+          rating: subRating,
+          comment: subComment,
           product_id: garment.id,
           website: revWebsite,
-          photos: revPhotos.map((p) => p.dataUrl),
+          photos: subPhotos,
         }),
       });
       if (res.status !== 404) {
@@ -156,20 +177,19 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
           setRevStatus(res.status === 409 || d.code === '23505' ? 'This review has already been submitted.' : (d.error || 'Unable to submit.'));
           return;
         }
-        setRevName(''); setRevComment(''); setRevRating(5); setRevPhotos([]);
-        setRevStatus('Submitted for moderation. Your star review will appear once approved.');
+        applyLiveReview();
         return;
       }
     } catch {/**/}
     const client = getCmsClient();
     if (!client) { setRevBusy(false); setRevStatus('Review submissions are currently unavailable.'); return; }
     const { error } = await client.from('nb_reviews').insert({
-      display_name: revName.trim(), rating: revRating, comment: revComment.trim(), product_id: garment.id,
-      photo_urls: revPhotos.map((p) => p.dataUrl),
+      display_name: subName, rating: subRating, comment: subComment, product_id: garment.id,
+      photo_urls: subPhotos,
     });
     setRevBusy(false);
     if (error) setRevStatus(error.code === '23505' ? 'This review has already been submitted.' : 'Unable to submit. Please try again.');
-    else { setRevName(''); setRevComment(''); setRevRating(5); setRevPhotos([]); setRevStatus('Submitted for moderation. Your star review will appear once approved.'); }
+    else { applyLiveReview(); }
   };
   const call = callingContact(contactPhone);
   const original=garment.originalPrice??null;

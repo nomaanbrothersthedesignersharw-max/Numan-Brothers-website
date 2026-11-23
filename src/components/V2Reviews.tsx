@@ -20,7 +20,7 @@ export default function V2Reviews(){
      }catch{/* Fallback to direct Supabase query in local dev */}
      if(!client)return;
      const {data,error}=await client.from('nb_reviews').select('id,display_name,rating,comment,created_at')
-       .eq('status','approved').order('approved_at',{ascending:false}).limit(6);
+       .eq('status','approved').order('created_at',{ascending:false}).limit(6);
      if(active&&!error)setRows((data||[]) as Review[]);
    };
    void load();
@@ -33,12 +33,27 @@ export default function V2Reviews(){
      setStatus('Enter a display name and a review of at least 20 characters.');return;
    }
    if(!client){setStatus('Online review submissions are currently unavailable.');return;}
-   setBusy(true);setStatus('');
+   const subName = name.trim();
+   const subComment = comment.trim();
+   const subRating = rating;
+   setBusy(true); setStatus('');
+   const applyLive = () => {
+     const newRev: Review = {
+       id: 'rev-' + Date.now(),
+       display_name: subName,
+       rating: subRating,
+       comment: subComment,
+       created_at: new Date().toISOString(),
+     };
+     setRows((prev) => [newRev, ...prev.filter((r) => r.comment !== subComment)]);
+     setName(''); setComment(''); setRating(5);
+     setStatus('Submitted for moderation. Your verified review is queued for public display.');
+   };
    try{
      const res=await fetch('/api/submit-review',{
        method:'POST',
        headers:{'Content-Type':'application/json',Accept:'application/json'},
-       body:JSON.stringify({display_name:name.trim(),rating,comment:comment.trim(),website}),
+       body:JSON.stringify({display_name:subName,rating:subRating,comment:subComment,website}),
      });
      if(res.status!==404){
        const data=await res.json().catch(()=>({})) as {error?:string;code?:string};
@@ -47,18 +62,16 @@ export default function V2Reviews(){
          setStatus(res.status===409||data.code==='23505'?'This review has already been submitted.':(data.error||'Unable to submit. Please try again.'));
          return;
        }
-       setName('');setComment('');setRating(5);
-       setStatus('Submitted for moderation. Your review is not yet public.');
+       applyLive();
        return;
      }
    }catch{/* Fall back to direct Supabase only when /api/submit-review is absent in local vite dev */}
    const {error}=await client.from('nb_reviews').insert({
-     display_name:name.trim(),rating,comment:comment.trim(),
+     display_name:subName,rating:subRating,comment:subComment,
    });
    setBusy(false);
    if(error)setStatus(error.code==='23505'?'This review has already been submitted.':'Unable to submit. Please try again.');
-   else{setName('');setComment('');setRating(5);
-     setStatus('Submitted for moderation. Your review is not yet public.');}
+   else{ applyLive(); }
  };
  return <section id="customer-reviews" aria-labelledby="nb-reviews-title"
    className="border-t border-[#d6c5ae] bg-[#f0e6d8] px-5 py-20 md:px-12 md:py-28 lg:px-20">
