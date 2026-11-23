@@ -15,6 +15,7 @@ export interface CmsProductRow {
   sizes: string[];
   image_urls: string[];
   video_url: string | null;
+  video_urls?: string[];
   price: number | null;
   offer_price: number | null;
   customizable: boolean;
@@ -171,8 +172,26 @@ export const mediaPublicUrl = (path: string): string => {
   return client?.storage.from('nb-media-public').getPublicUrl(path).data.publicUrl || '';
 };
 
+/**
+ * Serves resized, content-negotiated WebP/AVIF images via Supabase Image Transformations
+ * when explicitly enabled (Pro+ plan). On Supabase Free tier, serves the already-compressed
+ * WebP from nb-media-public directly so images never fail with 403.
+ */
+export const optimizedImageUrl = (url: string, width = 800, quality = 80): string => {
+  if (!url || !isSafeHttps(url) || import.meta.env.VITE_SUPABASE_IMAGE_TRANSFORM !== 'true') return url;
+  const marker = '/storage/v1/object/public/nb-media-public/';
+  const idx = url.indexOf(marker);
+  if (idx === -1 || /\.(svg|gif)(\?|$)/i.test(url)) return url;
+  const base = url.slice(0, idx);
+  const path = url.slice(idx + marker.length).split('?')[0];
+  return `${base}/storage/v1/render/image/public/nb-media-public/${path}?width=${width}&quality=${quality}&resize=contain`;
+};
+
 export function rowToProduct(row: CmsProductRow): CatalogProduct {
   const images = Array.isArray(row.image_urls) ? row.image_urls.filter(isSafeHttps) : [];
+  const videoUrls = Array.isArray(row.video_urls) && row.video_urls.length
+    ? row.video_urls.filter(isSafeHttps)
+    : (row.video_url && isSafeHttps(row.video_url) ? [row.video_url] : []);
   const p: Product = {
     id: row.id, title: row.title, price: row.offer_price ?? row.price ?? 0, mrp: row.price ?? 0,
     images, category: row.department, fabric: row.fabric || '', length: '',
@@ -181,7 +200,8 @@ export function rowToProduct(row: CmsProductRow): CatalogProduct {
     hasBottom: false, sizeChart: { top: [] }, reviews: [],
   };
   return { ...p, slug:row.slug,sku:row.sku,collectionPaths: row.category_paths || [], department: row.department,
-    videoUrl: row.video_url && isSafeHttps(row.video_url) ? row.video_url : undefined,
+    videoUrl: videoUrls[0] || undefined,
+    videoUrls,
     published: row.status === 'published',
     offerPrice:row.offer_price??undefined,
     originalPrice:row.price??undefined,
@@ -197,6 +217,26 @@ export interface PublishedData {
 export async function loadPublishedData(): Promise<PublishedData> {
   const client = getCmsClient();
   if (!client) return { products: [], homepage: HOME_TEMPLATE, categories: [], error: 'CMS not connected. Configure a dedicated Nomaan Brothers Supabase project.' };
+  if (typeof window !== 'undefined') {
+    try {
+      const edgeRes = await fetch('/api/home-data', { headers: { Accept: 'application/json' } });
+      if (edgeRes.ok && edgeRes.headers.get('content-type')?.includes('application/json')) {
+        const payload = (await edgeRes.json()) as {
+          products?: CmsProductRow[];
+          homeContent?: unknown;
+          categories?: CmsCategoryRow[];
+        };
+        return {
+          products: (payload.products || []).map((p) => rowToProduct(p)),
+          homepage: cleanHome(payload.homeContent),
+          categories: (payload.categories || []) as CmsCategoryRow[],
+          error: null,
+        };
+      }
+    } catch {
+      // Fall back to direct Supabase query (e.g., local vite dev without Vercel functions)
+    }
+  }
   try {
     const [productsResult, homeResult, categoriesResult] = await Promise.all([
       client.from('nb_products')

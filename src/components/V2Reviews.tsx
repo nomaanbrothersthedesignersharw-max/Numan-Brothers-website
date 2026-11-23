@@ -9,11 +9,21 @@ export default function V2Reviews(){
  const [name,setName]=useState(''),[comment,setComment]=useState(''),[rating,setRating]=useState(5);
  const [website,setWebsite]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
  useEffect(()=>{
-   if(!client)return;
    let active=true;
-   void client.from('nb_reviews').select('id,display_name,rating,comment,created_at')
-     .eq('status','approved').order('approved_at',{ascending:false}).limit(6)
-     .then(({data,error})=>{if(active&&!error)setRows((data||[]) as Review[])});
+   const load=async()=>{
+     try{
+       const res=await fetch('/api/reviews',{headers:{Accept:'application/json'}});
+       if(res.ok&&res.headers.get('content-type')?.includes('application/json')){
+         const payload=await res.json() as {reviews?:Review[]};
+         if(active&&Array.isArray(payload.reviews)){setRows(payload.reviews);return;}
+       }
+     }catch{/* Fallback to direct Supabase query in local dev */}
+     if(!client)return;
+     const {data,error}=await client.from('nb_reviews').select('id,display_name,rating,comment,created_at')
+       .eq('status','approved').order('approved_at',{ascending:false}).limit(6);
+     if(active&&!error)setRows((data||[]) as Review[]);
+   };
+   void load();
    return()=>{active=false};
  },[client]);
  const submit=async(e:React.FormEvent)=>{
@@ -24,6 +34,24 @@ export default function V2Reviews(){
    }
    if(!client){setStatus('Online review submissions are currently unavailable.');return;}
    setBusy(true);setStatus('');
+   try{
+     const res=await fetch('/api/submit-review',{
+       method:'POST',
+       headers:{'Content-Type':'application/json',Accept:'application/json'},
+       body:JSON.stringify({display_name:name.trim(),rating,comment:comment.trim(),website}),
+     });
+     if(res.status!==404){
+       const data=await res.json().catch(()=>({})) as {error?:string;code?:string};
+       setBusy(false);
+       if(!res.ok){
+         setStatus(res.status===409||data.code==='23505'?'This review has already been submitted.':(data.error||'Unable to submit. Please try again.'));
+         return;
+       }
+       setName('');setComment('');setRating(5);
+       setStatus('Submitted for moderation. Your review is not yet public.');
+       return;
+     }
+   }catch{/* Fall back to direct Supabase only when /api/submit-review is absent in local vite dev */}
    const {error}=await client.from('nb_reviews').insert({
      display_name:name.trim(),rating,comment:comment.trim(),
    });

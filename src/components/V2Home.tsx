@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import {ArrowDownRight,ArrowRight,ArrowUpRight,MapPin,MoveDownRight,MessageCircle,Phone,Scissors,Ruler} from 'lucide-react';
 import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
 import { Product } from '../types';
-import { type CmsHome, type CmsCategoryRow } from '../lib/cmsData';
+import { optimizedImageUrl, type CmsHome, type CmsCategoryRow } from '../lib/cmsData';
 import {siteText,homeSectionStyle,featuredCardStyle} from '../lib/siteContent';
 import { productsForCollection, productImage } from '../storefront/catalog';
 import V2Link from './V2Link';
@@ -50,7 +50,7 @@ export default function V2Home({ products, home, categories=[], onNavigate }: Pr
     <section ref={hero} data-nb-contact-hero style={homeSectionStyle(home,'hero')} className="relative isolate min-h-[620px] overflow-hidden bg-[#211b17] text-[#fff8ed] md:min-h-[730px] lg:min-h-[min(860px,calc(100svh-106px))]" aria-labelledby="v2-home-title">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_28%_35%,#5d4939_0,transparent_56%)]" />
       <div className="absolute inset-y-0 right-0 w-[100%] md:w-[65%] lg:w-[57%]">
-           {photo && <motion.img src={photo} alt="" fetchPriority="high" loading="eager" decoding="async"
+           {photo && <motion.img src={optimizedImageUrl(photo, 1600, 85)} alt="" fetchPriority="high" loading="eager" decoding="async"
              className="h-full w-full scale-[1.10] object-cover object-center opacity-[.60] md:opacity-90"
              style={reduce ? undefined : { y: imageY }} />}
          </div>
@@ -206,7 +206,7 @@ export default function V2Home({ products, home, categories=[], onNavigate }: Pr
             <V2Reveal key={edit.route} delay={i * 0.075} style={featuredCardStyle(home,edit.id)} className={'group overflow-hidden ' + edit.tone}>
               <V2Link href={edit.route} onNavigate={onNavigate} className="block">
                 <div className="relative aspect-[3/4] overflow-hidden">
-                  {edit.image ? <img src={edit.image} alt="" loading="lazy" decoding="async"
+                  {edit.image ? <img src={optimizedImageUrl(edit.image, 700, 80)} alt="" loading="lazy" decoding="async"
                     className="h-full w-full object-cover object-top opacity-85 transition-transform duration-700 group-hover:scale-[1.045]"/>
                     : <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_60%_30%,#80705c,transparent_60%)]">
                       <span className="font-serif text-7xl italic text-white/15">{String(i + 1).padStart(2,'0')}</span></div>}

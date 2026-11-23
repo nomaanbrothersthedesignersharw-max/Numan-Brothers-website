@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight, MapPin, MessageCircle, Sparkles, Phone, Scissors } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, ChevronLeft, ChevronRight, MapPin, MessageCircle, Sparkles, Phone, Scissors, X, ZoomIn } from 'lucide-react';
 import type { Product } from '../types';
 import { productImage, productPath, type CatalogProduct } from '../storefront/catalog';
+import { toggleShortlistItem, useShortlist } from '../storefront/shortlist';
 import {loadRelatedProducts} from '../lib/catalogQueries';
 import {callingContact,whatsappContact} from '../lib/contactLinks';
 import ShareCatalogue from './ShareCatalogue';
@@ -9,7 +10,7 @@ import { getRelatedCollectionLinks } from '../storefront/navigation';
 import { productTheme } from '../storefront/productTheme';
 import V2Link from './V2Link';
 import V2Reveal from './V2Reveal';
-import type {CmsHome} from '../lib/cmsData';
+import { optimizedImageUrl, type CmsHome } from '../lib/cmsData';
 import {siteText} from '../lib/siteContent';
 
 interface Props {product:Product;whatsappNumber?:string;contactPhone?:string;home?:CmsHome;onNavigate:(path:string)=>void;}
@@ -24,9 +25,23 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   const theme = productTheme(garment);
   const images = (product.images || []).filter(image => /^https:\/\//i.test(image) || (garment.slug==='sample-plain-sherwani' && /^\/editorial\/(sherwani|kurta|jodhpuri)[.]svg$/.test(image)));
   const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedVideo, setSelectedVideo] = useState(0);
   const [selectedSize,setSelectedSize]=useState('');
   const [shareStatus,setShareStatus]=useState('');
   const [related,setRelated]=useState<CatalogProduct[]>([]);
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const shortlist = useShortlist();
+  const isSaved = shortlist.some((item) => item.id === garment.id);
+  useEffect(() => {
+    if (!zoomOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setZoomOpen(false);
+      else if (e.key === 'ArrowRight' && images.length > 1) setSelectedImage((c) => (c + 1) % images.length);
+      else if (e.key === 'ArrowLeft' && images.length > 1) setSelectedImage((c) => (c + images.length - 1) % images.length);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoomOpen, images.length]);
   useEffect(()=>{
     let active=true;
     if(garment.slug!=='sample-plain-sherwani')void loadRelatedProducts(garment,4).then(rows=>{if(active)setRelated(rows)});
@@ -35,7 +50,9 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   const visual = images[selectedImage] || productImage(product);
   const siblings = getRelatedCollectionLinks(theme.collectionPath)
     .filter(link => link.path !== theme.collectionPath).slice(0, 5);
-  const videoUrl = garment.videoUrl;
+  const videoList = (garment.videoUrls?.length ? garment.videoUrls : (garment.videoUrl ? [garment.videoUrl] : []))
+    .filter((u) => typeof u === 'string' && /^https:\/\//i.test(u));
+  const videoUrl = videoList[selectedVideo] || videoList[0];
   const playableVideo = typeof videoUrl === 'string' && /^https:\/\//i.test(videoUrl) &&
     (/\.(mp4|webm)(\?|$)/i.test(videoUrl) || videoUrl.includes('/storage/v1/object/public/nb-media-public/'));
   const call=callingContact(contactPhone);
@@ -91,15 +108,19 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
             <div className="relative mx-auto max-w-[700px]">
               <div className="absolute -left-3 -top-3 h-32 w-32 border-l border-t border-white/45 md:-left-5 md:-top-5" aria-hidden="true"/>
               <div className="group relative aspect-[3/4] overflow-hidden border border-white/20 bg-[#dbcbb4]/20 shadow-[0_30px_85px_-26px_rgba(0,0,0,.65)]">
-                {visual ? <img src={visual} alt={product.title}
+                {visual ? <img src={optimizedImageUrl(visual, 1200, 85)} alt={product.title}
                   loading="eager" fetchPriority="high" decoding="async"
-                  className="h-full w-full object-cover object-top motion-safe:transition-transform motion-safe:duration-700 motion-safe:group-hover:scale-[1.025]"/> :
+                  onClick={() => setZoomOpen(true)}
+                  className="h-full w-full cursor-zoom-in object-cover object-top motion-safe:transition-transform motion-safe:duration-700 motion-safe:group-hover:scale-[1.025]"/> :
                   <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#765d4c] via-[#3c302a] to-[#21191a]">
                     <span className="font-serif text-5xl italic text-[#ead5b3]/65 md:text-7xl">Nomaan</span>
                   </div>}
                 <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/40 to-transparent px-5 py-5 text-[10px] font-semibold uppercase tracking-[.2em] text-white">
                   <span>{siteText(home,'product.brand')}</span>
-                  {images.length > 0 && <span>{String(selectedImage + 1).padStart(2,'0')} / {String(images.length).padStart(2,'0')}</span>}
+                  <div className="flex items-center gap-3">
+                    {images.length > 0 && <span>{String(selectedImage + 1).padStart(2,'0')} / {String(images.length).padStart(2,'0')}</span>}
+                    {visual && <button type="button" onClick={() => setZoomOpen(true)} aria-label="Zoom garment photograph" className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full border border-white/40 bg-black/40 text-white hover:bg-black/70"><ZoomIn size={15}/></button>}
+                  </div>
                 </div>
                 {images.length > 1 && <div className="absolute inset-x-4 bottom-4 flex justify-between gap-3">
                   <button type="button" onClick={() => setSelectedImage(current => (current + images.length - 1) % images.length)}
@@ -118,15 +139,26 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
                   onClick={() => setSelectedImage(index)}
                   className={'relative h-20 w-[68px] shrink-0 overflow-hidden border-2 bg-[#a68e75]/30 transition-colors md:h-24 md:w-20 ' +
                     (selectedImage === index ? 'border-[#efc995]' : 'border-white/25 hover:border-white/65')}>
-                  <img src={image} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-top"/>
+                  <img src={optimizedImageUrl(image, 200, 75)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover object-top"/>
                   {selectedImage === index && <span className="absolute inset-x-1 bottom-1 h-[2px] bg-[#efc995]" aria-hidden="true"/>}
                 </button>)}
               </div>}
-              {videoUrl && <div className="mt-5 overflow-hidden border border-white/15 bg-[#1c1714]">
-                <div className="flex items-center gap-2 border-b border-white/10 px-5 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-[#e5c89e]">
-                  <Sparkles size={14}/> {siteText(home,'product.videoTitle')}
+              {videoList.length > 0 && <div className="mt-5 overflow-hidden border border-white/15 bg-[#1c1714]">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-5 py-3 text-[10px] font-semibold uppercase tracking-[.16em] text-[#e5c89e]">
+                  <span className="inline-flex items-center gap-2"><Sparkles size={14}/> {siteText(home,'product.videoTitle')}</span>
+                  {videoList.length > 1 && (
+                    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Choose garment video">
+                      {videoList.map((_, idx) => (
+                        <button key={idx} type="button" onClick={() => setSelectedVideo(idx)} aria-pressed={selectedVideo === idx}
+                          className={'rounded-full px-2.5 py-1 text-[10px] font-bold transition-colors ' +
+                            (selectedVideo === idx ? 'bg-[#e5c89e] text-[#1c1714]' : 'border border-white/25 text-white/80 hover:bg-white/10')}>
+                          Video {String(idx + 1).padStart(2, '0')}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {playableVideo ? <video src={videoUrl} controls preload="none" playsInline poster={images[0]}
+                {playableVideo ? <video key={videoUrl} src={videoUrl} controls preload="none" playsInline poster={images[0] ? optimizedImageUrl(images[0], 1200, 80) : undefined}
                   className="aspect-video w-full" aria-label={'Video of ' + product.title}/> :
                   <a href={videoUrl} target="_blank" rel="noopener noreferrer"
                     className="flex min-h-20 items-center justify-center gap-3 text-sm font-medium text-white">{siteText(home,'product.videoCta')} <ArrowUpRight size={17}/></a>}
@@ -142,10 +174,16 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
               <p className="mt-4 text-[11px] font-medium uppercase tracking-[.15em] text-[#8b745b]">{theme.collectionLabel} / Nomaan Brothers</p>
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
                 {garment.sku&&<p className="break-all text-xs font-semibold tracking-[.09em] text-[#8a745b]">Style code · {garment.sku}</p>}
-                <button type="button" onClick={()=>void share()}
-                  className="inline-flex min-h-11 items-center gap-2 border-b border-[#957c5b] text-xs font-semibold text-[#6b5133] hover:text-[#29221b]">
-                  Share this design <ArrowUpRight size={15}/>
-                </button>
+                <div className="flex flex-wrap items-center gap-4">
+                  <button type="button" onClick={() => toggleShortlistItem(garment)} aria-pressed={isSaved}
+                    className="inline-flex min-h-11 items-center gap-1.5 border-b border-[#957c5b] text-xs font-semibold text-[#6b5133] hover:text-[#29221b]">
+                    <Bookmark size={14} className={isSaved ? 'fill-[#6b5133]' : ''} /> {isSaved ? 'Saved to shortlist' : 'Save to shortlist'}
+                  </button>
+                  <button type="button" onClick={()=>void share()}
+                    className="inline-flex min-h-11 items-center gap-2 border-b border-[#957c5b] text-xs font-semibold text-[#6b5133] hover:text-[#29221b]">
+                    Share this design <ArrowUpRight size={15}/>
+                  </button>
+                </div>
               </div>
               <p role="status" aria-live="polite" className="text-xs text-[#78624b]">{shareStatus}</p>
               <div className="mt-3">
@@ -241,7 +279,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
       <div className="nb-responsive-grid grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-5 lg:grid-cols-4">
         {related.map(item=><V2Link key={item.id} href={productPath(item)} onNavigate={onNavigate} className="group min-w-0">
           <div className="aspect-[3/4] overflow-hidden bg-[#e7dccb]">
-            {productImage(item)?<img src={productImage(item)} alt={item.title} loading="lazy" decoding="async"
+            {productImage(item)?<img src={optimizedImageUrl(productImage(item), 500, 80)} alt={item.title} loading="lazy" decoding="async"
               className="h-full w-full object-cover object-top transition-transform duration-500 motion-safe:group-hover:scale-[1.04]"/>:
               <div className="flex h-full items-center justify-center font-serif text-xl text-[#6a5844]">Nomaan</div>}
           </div>
@@ -251,5 +289,29 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
         </V2Link>)}
       </div>
     </section>}
+    {zoomOpen && visual && (
+      <div role="dialog" aria-modal="true" aria-label={product.title + ' enlarged photograph'}
+        className="fixed inset-0 z-[95] flex items-center justify-center bg-[#120e0b]/95 p-4 backdrop-blur-md">
+        <button type="button" aria-label="Close zoom" onClick={() => setZoomOpen(false)}
+          className="absolute right-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/50 text-white hover:bg-white hover:text-[#211b17]">
+          <X size={22} />
+        </button>
+        {images.length > 1 && (
+          <>
+            <button type="button" aria-label="Previous photograph"
+              onClick={() => setSelectedImage((c) => (c + images.length - 1) % images.length)}
+              className="absolute left-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/50 text-white hover:bg-white hover:text-[#211b17]">
+              <ChevronLeft size={22} />
+            </button>
+            <button type="button" aria-label="Next photograph"
+              onClick={() => setSelectedImage((c) => (c + 1) % images.length)}
+              className="absolute right-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/30 bg-black/50 text-white hover:bg-white hover:text-[#211b17]">
+              <ChevronRight size={22} />
+            </button>
+          </>
+        )}
+        <img src={visual} alt={product.title} className="max-h-[90vh] max-w-[92vw] rounded object-contain shadow-2xl" />
+      </div>
+    )}
   </div>;
 }

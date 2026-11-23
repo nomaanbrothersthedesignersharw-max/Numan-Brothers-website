@@ -1,0 +1,16 @@
+{
+  "name": "Nomaan Brothers",
+  "short_name": "Nomaan Bros",
+  "description": "Men's & Kids' Traditional Occasionwear in Mandi Bazar, Warangal.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fbf8f2",
+  "theme_color": "#211b17",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -88,12 +88,47 @@ const mediaSelectColumns = 'id,storage_path,original_name,mime_type,size_bytes,a
  * ID and row index. It prevents duplicate Storage objects if the upload
  * succeeded before the audit row was saved.
  */
+const MAX_DIMENSION = 1440;
+const COMPRESS_THRESHOLD_BYTES = 200 * 1024;
+
+/** Downscale and WebP-compress large interactive camera photos before upload. */
+async function optimizeImageForWeb(file: File): Promise<File> {
+  if (
+    typeof document === 'undefined' ||
+    typeof createImageBitmap !== 'function' ||
+    file.size <= COMPRESS_THRESHOLD_BYTES ||
+    !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+  ) {
+    return file;
+  }
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { bitmap.close(); return file; }
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.80));
+    if (!blob || blob.size >= file.size) return file;
+    const baseName = file.name.replace(/\.[^.]+$/, '') || 'garment';
+    return new File([blob], baseName + '.webp', { type: 'image/webp', lastModified: file.lastModified });
+  } catch {
+    return file;
+  }
+}
+
 export async function uploadCmsFile(
-  client: SupabaseClient, file: File, userId: string, onProgress: (value: number) => void,
+  client: SupabaseClient, rawFile: File, userId: string, onProgress: (value: number) => void,
   options?: {stableObjectId?:string;department?:'men'|'kids'|null;categoryPath?:string|null},
 ): Promise<CmsMediaRow> {
-  const validation = checkMediaFile(file);
+  const validation = checkMediaFile(rawFile);
   if (validation) throw new Error(validation);
+  const file = options?.stableObjectId ? rawFile : await optimizeImageForWeb(rawFile);
   const extension = allowed.get(file.type)!;
   const objectId = options?.stableObjectId ?? crypto.randomUUID();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(objectId))
@@ -126,7 +161,7 @@ export async function uploadCmsFile(
 
   if (!alreadyStored && file.size <= CHUNK_SIZE) {
     const { error } = await client.storage.from('nb-media-staging').upload(path, file, {
-      upsert:false, cacheControl:'3600', contentType:file.type,
+      upsert:false, cacheControl:'31536000', contentType:file.type,
     });
     if (error) throw error;
     onProgress(100);

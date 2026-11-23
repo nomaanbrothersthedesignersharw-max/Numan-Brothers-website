@@ -55,7 +55,7 @@ export default function FloatingContactDock({home,path,product}:Props){
   if(!visible)return null;
 
   return <aside data-testid="floating-contact-dock" aria-label="Contact Nomaan Brothers"
-    className="fixed bottom-[calc(.9rem+env(safe-area-inset-bottom))] left-[calc(.75rem+env(safe-area-inset-left))] z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 sm:bottom-6 sm:left-[calc(1.5rem+env(safe-area-inset-left))]"
+    className="fixed bottom-[calc(.9rem+env(safe-area-inset-bottom))] left-[calc(.75rem+env(safe-area-inset-left))] z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2 [@media(max-height:460px)]:hidden sm:bottom-6 sm:left-[calc(1.5rem+env(safe-area-inset-left))]"
     role="complementary">
     {fallback&&<a href={fallbackHref}
       aria-label={path==='/contact'?'Find Nomaan Brothers showroom directions':'Contact Nomaan Brothers showroom'}

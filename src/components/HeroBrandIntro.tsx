@@ -16,8 +16,14 @@ interface Props {
 }
 type ConnectionWithSaveData=Navigator&{connection?:{saveData?:boolean}};
 
+const INTRO_SESSION_KEY = 'nb_intro_seen';
+const wasSeenInSession = (): boolean => {
+  try { return typeof window !== 'undefined' && window.sessionStorage?.getItem(INTRO_SESSION_KEY) === '1'; }
+  catch { return false; }
+};
+
 export default function HeroBrandIntro({url,poster,reducedMotion,replay=false,onComplete}:Props){
-  const [phase,setPhase]=useState<Phase>(()=>shownThisPage&&!replay?'finished':'playing');
+  const [phase,setPhase]=useState<Phase>(()=>(shownThisPage||wasSeenInSession())&&!replay?'finished':'playing');
   const [videoReady,setVideoReady]=useState(false);
   const [videoFailed,setVideoFailed]=useState(false);
   const videoRef=useRef<HTMLVideoElement>(null);
@@ -30,6 +36,7 @@ export default function HeroBrandIntro({url,poster,reducedMotion,replay=false,on
   useEffect(()=>{
     if(phase!=='playing')return;
     shownThisPage=true;
+    try{window.sessionStorage?.setItem(INTRO_SESSION_KEY,'1');}catch{/**/}
     const dataSaver=(navigator as ConnectionWithSaveData).connection?.saveData===true;
     if(reducedMotion||dataSaver){setPhase('finished');return;}
     const timer=window.setTimeout(beginExit,INTRO_DURATION_MS);
@@ -88,7 +95,8 @@ export default function HeroBrandIntro({url,poster,reducedMotion,replay=false,on
     data-phase={phase}
     role="dialog" aria-modal="true"
     aria-label="Nomaan Brothers opening introduction"
-    className={'nb-brand-intro fixed inset-0 z-[90] overflow-hidden bg-[#16110e] text-[#f8ead5] '+
+    onClick={skip}
+    className={'nb-brand-intro fixed inset-0 z-[90] cursor-pointer overflow-hidden bg-[#16110e] text-[#f8ead5] '+
       (phase==='leaving'?'nb-brand-intro--leaving':'')}
     onTransitionEnd={event=>{
       if(event.target===event.currentTarget&&phase==='leaving')setPhase('finished');

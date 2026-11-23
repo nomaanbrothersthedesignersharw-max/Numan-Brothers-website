@@ -20,12 +20,12 @@ const migrationNames = [
   '20261109190000_media_lifecycle_scale_indexes.sql',
   '20261109194500_client_sku_handoff.sql',
 ];
-const bundle = readFileSync('supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql','utf8');
+const bundle = readFileSync('supabase/sql-editor/NOMAN_BROTHERS_INSTALL_FRESH_PROJECT.sql','utf8').replace(/\r\n/g,'\n');
 
 test('all sixteen migrations are included byte-for-byte in source order with only transaction wrappers removed',()=>{
   const positions=[];
   for(let index=0;index<migrationNames.length;index++){
-    const source=readFileSync('supabase/migrations/'+migrationNames[index],'utf8');
+    const source=readFileSync('supabase/migrations/'+migrationNames[index],'utf8').replace(/\r\n/g,'\n');
     assert.equal((source.match(/^begin;\s*$/gmi)||[]).length,1);
     assert.equal((source.match(/^commit;\s*$/gmi)||[]).length,1);
     const sql=source.replace(/^begin;\s*$/gmi,'').replace(/^commit;\s*$/gmi,'').trim();

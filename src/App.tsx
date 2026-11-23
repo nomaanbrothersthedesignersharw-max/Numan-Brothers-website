@@ -3,26 +3,45 @@ import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, ArrowRight, ArrowUpRight, MapPin, MessageCircle } from 'lucide-react';
 import { type PublishedData, HOME_TEMPLATE, loadPublishedData, isSafeHttps } from './lib/cmsData';
 import {siteText} from './lib/siteContent';
-import { loadCataloguePage, loadProductById, type CataloguePage } from './lib/catalogQueries';
+import { loadCataloguePage, loadProductById, type CataloguePage, type CatalogueSort } from './lib/catalogQueries';
 import type { CatalogProduct } from './storefront/catalog';
 import { productPath, publicProducts } from './storefront/catalog';
 import { SAMPLE_SHERWANI } from './storefront/sampleProduct';
 import { getCollection } from './storefront/navigation';
 import { useStoreHistory } from './storefront/history';
+import { callingContact, whatsappContact } from './lib/contactLinks';
 import V2Header from './components/V2Header';
 import FloatingContactDock from './components/FloatingContactDock';
 import SocialLinks from './components/SocialLinks';
-import V2Reviews from './components/V2Reviews';
 import V2Home from './components/V2Home';
 
 import V2Footer from './components/V2Footer';
 import V2Link from './components/V2Link';
 import V2Reveal from './components/V2Reveal';
-// Keep the landing page eager; secondary catalogue and garment editors load on demand.
+// Keep the landing page eager; secondary catalogue, reviews and garment editors load on demand.
 const V2Collection = React.lazy(() => import('./components/V2Collection'));
 const V2ProductGrid = React.lazy(() => import('./components/V2Collection').then(module => ({ default: module.V2ProductGrid })));
 const V2Product = React.lazy(() => import('./components/V2Product'));
+const V2Reviews = React.lazy(() => import('./components/V2Reviews'));
 const CmsStudio = React.lazy(() => import('./components/CmsStudio'));
+const ShortlistDrawer = React.lazy(() => import('./components/ShortlistDrawer'));
+
+function CatalogueSkeleton() {
+  return (
+    <div className="mx-auto max-w-[1440px] px-5 py-16 md:px-12 lg:px-20" role="status" aria-label="Loading collection">
+      <div className="mb-10 h-10 w-64 animate-pulse rounded bg-[#e8dccb]" />
+      <div className="grid grid-cols-1 gap-6 min-[360px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="space-y-3">
+            <div className="aspect-[3/4] w-full animate-pulse bg-[#e8dccb]" />
+            <div className="h-4 w-3/4 animate-pulse rounded bg-[#ece2d3]" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-[#efe6d8]" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** Public catalogue is read-only. All editorial mutations happen in the authenticated studio. */
 export default function App() {
@@ -35,13 +54,18 @@ export default function App() {
   useEffect(() => {
     if(isStudioPath)return;
     let active = true;
-    const reload = async () => {
+    let lastLoadedAt = 0;
+    const reload = async (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastLoadedAt < 30_000) return;
+      lastLoadedAt = now;
       const next = await loadPublishedData();
       if (active) { setSiteData(next); setCatalogLoading(false); }
     };
-    void reload();
-    window.addEventListener('focus', reload);
-    return () => { active = false; window.removeEventListener('focus', reload); };
+    const onFocus = () => { void reload(false); };
+    void reload(true);
+    window.addEventListener('focus', onFocus);
+    return () => { active = false; window.removeEventListener('focus', onFocus); };
   }, [isStudioPath]);
 
   const published = useMemo(() => publicProducts(siteData.products), [siteData.products]);
@@ -59,20 +83,22 @@ export default function App() {
   const selectedId = path.startsWith('/products/') ? path.slice('/products/'.length) : null;
   const searchQuery = path === '/search' ? new URLSearchParams(url.split('?')[1] || '').get('q')?.trim() || '' : '';
   const [page,setPage] = useState(0);
+  const [sort, setSort] = useState<CatalogueSort>('featured');
+  const [customizableOnly, setCustomizableOnly] = useState(false);
   const [routeResult,setRouteResult] = useState<{key:string;data:CataloguePage}|null>(null);
   const [detail,setDetail] = useState<{id:string;product:CatalogProduct|null}|null>(null);
-  const routeKey = path + '|' + searchQuery + '|' + page;
-  useEffect(()=>setPage(0),[path,searchQuery]);
+  const routeKey = path + '|' + searchQuery + '|' + page + '|' + sort + '|' + (customizableOnly ? '1' : '0');
+  useEffect(()=>{setPage(0);setSort('featured');setCustomizableOnly(false);},[path,searchQuery]);
   useEffect(()=>{
     let active=true;
     if(collectionDefault || path==='/search'){
-      void loadCataloguePage({route:collectionDefault?.path,query:searchQuery,page})
+      void loadCataloguePage({route:collectionDefault?.path,query:searchQuery,page,sort,customizable:customizableOnly})
         .then(data=>{if(active)setRouteResult({key:routeKey,data})});
     } else setRouteResult(null);
     if(selectedId)void loadProductById(selectedId).then(product=>{if(active)setDetail({id:selectedId,product})});
     else setDetail(null);
     return ()=>{active=false};
-  },[path,searchQuery,page]);
+  },[path,searchQuery,page,sort,customizableOnly]);
   const activeRoutePage = routeResult?.key===routeKey ? routeResult.data : null;
   const matches = activeRoutePage?.products || [];
   const product = selectedId===SAMPLE_SHERWANI.slug ? SAMPLE_SHERWANI : selectedId && detail?.id===selectedId ? detail.product : undefined;
@@ -86,6 +112,12 @@ export default function App() {
     collection ? collection.title : product ? product.title :
     path === '/search' ? 'Search Collections' : path === '/contact' ? 'Visit Our Showroom' : legalPage?.title || 'Page Not Found';
 
+  const contactWhatsappUrl = whatsappContact(
+    siteData.homepage.contactWhatsapp,
+    'Hello Nomaan Brothers, I would like to enquire about your collections.',
+  );
+  const contactCallUrl = callingContact(siteData.homepage.contactPhone);
+
   if (isStudioPath) {
     return <Suspense fallback={<p role="status" className="p-12">Loading private studio…</p>}><CmsStudio/></Suspense>;
   }
@@ -93,26 +125,29 @@ export default function App() {
   return <div className="min-h-screen bg-[#fbf8f2]">
     <Helmet>
       {selectedId===SAMPLE_SHERWANI.slug&&<meta name="robots" content="noindex, nofollow"/>}
-      <title>{title} | {siteText(siteData.homepage,'seo.brand')}</title>
+      <title>{`${title} | ${siteText(siteData.homepage,'seo.brand')}`}</title>
       <meta name="description" content={product?.description?.trim().slice(0,210)||siteText(siteData.homepage,'seo.description')} />
       {product&&<meta property="og:type" content="product"/>}
       {product?.images?.[0]&&<meta property="og:image" content={product.images[0]}/>}
       <meta name="theme-color" content="#fbf8f2"/>
-      <meta property="og:title" content={title + ' | '+siteText(siteData.homepage,'seo.brand')} />
+      <meta property="og:title" content={`${title} | ${siteText(siteData.homepage,'seo.brand')}`} />
     </Helmet>
     <V2Header path={path} home={siteData.homepage} categories={siteData.categories} onNavigate={navigate}/>
     <main id="main-content" className="min-h-[40vh]">
       {!catalogLoading && siteData.error && <div role="status" className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-center text-xs text-amber-900">
         The online catalogue is temporarily unavailable. Contact the showroom for current styles.
       </div>}
-      <Suspense fallback={<div className="flex min-h-[45vh] items-center justify-center px-5 text-sm text-stone-600" role="status">Loading collection…</div>}>
+      <Suspense fallback={<CatalogueSkeleton/>}>
       {path === '/' ? <V2Home products={published} home={siteData.homepage} categories={siteData.categories} onNavigate={navigate}/> :
        collection ? (activeRoutePage ? <V2Collection route={collection} products={matches}
          bannerImage={categoryOverride?.image_url && isSafeHttps(categoryOverride.image_url) ? categoryOverride.image_url : undefined}
          home={siteData.homepage} categories={siteData.categories} totalCount={activeRoutePage.count}
-         page={page} pageSize={activeRoutePage.pageSize} onPageChange={setPage} onNavigate={navigate}/> :
-         <p role="status" className="p-12 text-center text-stone-500">Loading collection…</p>) :
-       selectedId && !detail && selectedId!==SAMPLE_SHERWANI.slug ? <p role="status" className="p-12 text-center text-stone-500">Loading product…</p> :
+         page={page} pageSize={activeRoutePage.pageSize} onPageChange={setPage}
+         sort={sort} onSortChange={(s) => { setPage(0); setSort(s); }}
+         customizableOnly={customizableOnly} onCustomizableChange={(v) => { setPage(0); setCustomizableOnly(v); }}
+         onNavigate={navigate}/> :
+         <CatalogueSkeleton/>) :
+       selectedId && !detail && selectedId!==SAMPLE_SHERWANI.slug ? <CatalogueSkeleton/> :
        product ? <V2Product key={product.id} product={product} home={siteData.homepage}
          whatsappNumber={siteData.homepage.contactWhatsapp} contactPhone={siteData.homepage.contactPhone} onNavigate={navigate}/> :
        path === '/search' ? <section className="mx-auto min-h-[70vh] min-w-0 max-w-[1360px] px-4 py-16 min-[360px]:px-5 md:px-12">
@@ -164,13 +199,13 @@ export default function App() {
                target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center gap-3 bg-[#e2c9a4] px-7 text-xs font-bold uppercase tracking-[.12em] text-[#2b2118]">
                <MapPin size={17}/> {siteText(siteData.homepage,'contact.directions')} <ArrowUpRight size={17}/>
              </a>
-             {siteData.homepage.contactWhatsapp && <a
-               href={'https://wa.me/'+siteData.homepage.contactWhatsapp+'?text='+encodeURIComponent('Hello Nomaan Brothers, I would like to enquire about your collections.')}
+             {contactWhatsappUrl && <a
+               href={contactWhatsappUrl}
                target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 items-center gap-3 border border-[#e2c9a4] px-7 text-xs font-bold uppercase tracking-[.12em] text-[#f8e9d0]">
                <MessageCircle size={17}/> {siteText(siteData.homepage,'contact.whatsapp')}
              </a>}
            </div>
-           {siteData.homepage.contactPhone&&<a href={'tel:+'+siteData.homepage.contactPhone}
+           {contactCallUrl&&<a href={contactCallUrl}
              className="mt-6 inline-flex min-h-12 items-center gap-3 border border-[#e2c9a4] px-7 text-xs font-bold uppercase text-[#f8e9d0]">
              {siteText(siteData.homepage,'contact.call')} <ArrowUpRight size={16}/></a>}
            <div className="mt-10 border-t border-[#786047] pt-6">
@@ -187,9 +222,10 @@ export default function App() {
          <V2Link href="/" onNavigate={navigate} className="mt-9 inline-flex min-h-12 items-center gap-3 bg-[#32271d] px-7 text-xs font-semibold uppercase tracking-[.12em] text-white">Return home <ArrowRight size={16}/></V2Link>
        </section>}
       </Suspense>
-      {path==='/'&&<V2Reviews/>}
+      {path==='/'&&<Suspense fallback={null}><V2Reviews/></Suspense>}
     </main>
     <V2Footer home={siteData.homepage} categories={siteData.categories} onNavigate={navigate}/>
     <FloatingContactDock home={siteData.homepage} path={path} product={product}/>
+    <Suspense fallback={null}><ShortlistDrawer whatsappNumber={siteData.homepage.contactWhatsapp} onNavigate={navigate}/></Suspense>
   </div>;
 }

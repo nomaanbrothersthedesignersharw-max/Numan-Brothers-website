@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion, useScroll } from 'motion/react';
 import { ArrowRight, ChevronDown, MapPin, Menu, Search, X } from 'lucide-react';
 import { DEPARTMENTS, DepartmentId, getDepartment } from '../storefront/navigation';
+import { loadCataloguePage } from '../lib/catalogQueries';
+import { productImage, productPath, type CatalogProduct } from '../storefront/catalog';
 import V2Link from './V2Link';
 import type {CmsHome,CmsCategoryRow} from '../lib/cmsData';
 import {siteText} from '../lib/siteContent';
@@ -21,6 +23,8 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
   const [mobileDepartment, setMobileDepartment] = useState<DepartmentId>('men');
   const [searchOpen, setSearchOpen] = useState(false);
   const [keyword, setKeyword] = useState('');
+  const [liveResults, setLiveResults] = useState<CatalogProduct[]>([]);
+  const [liveLoading, setLiveLoading] = useState(false);
   const reducedMotion = useReducedMotion();
   const wrapper = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll();
@@ -49,6 +53,29 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = old; };
   }, [mobile, searchOpen]);
+
+  useEffect(() => {
+    const q = keyword.trim();
+    if (!searchOpen || q.length < 2) {
+      setLiveResults([]);
+      setLiveLoading(false);
+      return;
+    }
+    let active = true;
+    setLiveLoading(true);
+    const timer = window.setTimeout(() => {
+      void loadCataloguePage({ query: q, page: 0 }).then((res) => {
+        if (active) {
+          setLiveResults(res.products.slice(0, 5));
+          setLiveLoading(false);
+        }
+      });
+    }, 280);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [keyword, searchOpen]);
 
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -124,7 +151,7 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
                   {siteText(home,'nav.viewAll')} <ArrowRight className="h-4 w-4" />
                 </V2Link>
               </div>
-              <div className={'grid gap-9 ' + (open === 'men' ? 'grid-cols-4' : 'grid-cols-2')}>
+              <div className={'grid gap-8 ' + (open === 'men' ? 'lg:grid-cols-2 xl:grid-cols-4' : 'grid-cols-2')}>
                 {getDepartment(open).groups.map(group=>({...group,items:group.items.filter(item=>visible(item.path))})).filter(group=>group.items.length>0).map((group) => (
                   <div key={group.title}>
                     <h3 className="mb-4 border-b border-[#ded1bd] pb-3 font-serif text-lg text-[#24201c]">{group.title}</h3>
@@ -209,6 +236,31 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
               <button type="submit" aria-label="Submit search" className="flex h-11 w-11 items-center justify-center"><ArrowRight/></button>
             </form>
             <p className="mt-5 text-xs leading-6 text-[#786d5e]">{siteText(home,'nav.searchHelp')}</p>
+            {liveLoading && <p role="status" className="mt-4 text-xs text-[#8a755c]">Searching styles…</p>}
+            {!liveLoading && liveResults.length > 0 && (
+              <ul className="mt-5 divide-y divide-[#e6dac8] border-t border-[#e6dac8]">
+                {liveResults.map((item) => (
+                  <li key={item.id}>
+                    <V2Link
+                      href={productPath(item)}
+                      onNavigate={go}
+                      className="flex items-center gap-3 py-3 transition-colors hover:bg-[#f1e8da]"
+                    >
+                      {productImage(item) ? (
+                        <img src={productImage(item)} alt="" className="h-14 w-11 shrink-0 rounded object-cover object-top" />
+                      ) : (
+                        <div className="flex h-14 w-11 shrink-0 items-center justify-center rounded bg-[#e8dccb] font-serif text-xs text-[#7c664a]">NB</div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-serif text-base text-[#29221c]">{item.title}</p>
+                        <p className="text-[11px] text-[#84715b]">{item.sku || item.fabric}</p>
+                      </div>
+                      <ArrowRight size={15} className="shrink-0 text-[#84715b]" />
+                    </V2Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </motion.div>
       )}
