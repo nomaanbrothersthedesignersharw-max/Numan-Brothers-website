@@ -154,7 +154,13 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
               <div className={'grid gap-8 ' + (open === 'men' ? 'lg:grid-cols-2 xl:grid-cols-4' : 'grid-cols-2')}>
                 {getDepartment(open).groups.map(group=>({...group,items:group.items.filter(item=>visible(item.path))})).filter(group=>group.items.length>0).map((group) => (
                   <div key={group.title}>
-                    <h3 className="mb-4 border-b border-[#ded1bd] pb-3 font-serif text-lg text-[#24201c]">{group.title}</h3>
+                    <h3 className="mb-4 border-b border-[#ded1bd] pb-3 font-serif text-lg text-[#24201c]">
+                      {group.landingPath ? (
+                        <V2Link href={group.landingPath} onNavigate={go} className="inline-flex items-center gap-1.5 transition-colors hover:text-[#936f44]">
+                          {group.title} <ArrowRight className="h-3.5 w-3.5 opacity-60" />
+                        </V2Link>
+                      ) : group.title}
+                    </h3>
                     <ul className="space-y-3.5">
                       {group.items.map((item) => (
                         <li key={item.path}>
@@ -199,7 +205,13 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
             </V2Link>
             {getDepartment(mobileDepartment).groups.map(group=>({...group,items:group.items.filter(item=>visible(item.path))})).filter(group=>group.items.length>0).map((group) => (
               <section key={group.title} className="mb-6">
-                <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[.2em] text-[#9b794d]">{group.title}</h3>
+                <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[.2em] text-[#9b794d]">
+                  {group.landingPath ? (
+                    <V2Link href={group.landingPath} onNavigate={go} className="inline-flex items-center gap-1.5 hover:underline">
+                      {group.title} <ArrowRight className="h-3 w-3" />
+                    </V2Link>
+                  ) : group.title}
+                </h3>
                 <ul className="space-y-1">
                   {group.items.map((item) => (
                     <li key={item.path}>

@@ -39,12 +39,10 @@ export const DEPARTMENTS: Department[] = [
         { label: 'Tobh', path: '/men/tope' },
       ] },
       { title: 'Sherwani', landingPath: '/men/sherwani', items: [
-        { label: 'All Sherwanis', path: '/men/sherwani' },
         { label: 'Handwork Sherwani', path: '/men/sherwani/handwork' },
         { label: 'Plain Sherwani', path: '/men/sherwani/plain' },
       ] },
       { title: 'Suits', landingPath: '/men/suits', items: [
-        { label: 'All Suits', path: '/men/suits' },
         { label: 'Handwork Suits', path: '/men/suits/handwork' },
         { label: 'Plain Suits', path: '/men/suits/plain' },
       ] },
