@@ -184,7 +184,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
               <div className="absolute -left-3 -top-3 h-32 w-32 border-l border-t border-white/45 md:-left-5 md:-top-5" aria-hidden="true"/>
               <div className="group relative aspect-[3/4] overflow-hidden border border-white/20 bg-[#dbcbb4]/20 shadow-[0_30px_85px_-26px_rgba(0,0,0,.65)]">
                 {activeSlide?.kind === 'video' ? (
-                  <video key={activeSlide.url} src={activeSlide.url} controls autoPlay muted loop playsInline poster={images[0] ? optimizedImageUrl(images[0], 1200, 80) : undefined}
+                  <video key={activeSlide.url} src={activeSlide.url} controls autoPlay muted loop playsInline preload="auto" poster={images[0] ? optimizedImageUrl(images[0], 1200, 80) : undefined}
                     className="h-full w-full bg-[#16110e] object-cover" aria-label={'Brand film of ' + product.title}/>
                 ) : visual ? <img key={visual} src={optimizedImageUrl(visual, 1200, 85)} alt={product.title}
                   loading="eager" fetchPriority="high" decoding="async"
@@ -243,7 +243,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
                     </div>
                   )}
                 </div>
-                {playableVideo ? <video key={videoUrl} src={videoUrl} controls preload="none" playsInline poster={images[0] ? optimizedImageUrl(images[0], 1200, 80) : undefined}
+                {playableVideo ? <video key={videoUrl} src={videoUrl} controls preload="metadata" playsInline poster={images[0] ? optimizedImageUrl(images[0], 1200, 80) : undefined}
                   className="aspect-video w-full" aria-label={'Video of ' + product.title}/> :
                   <a href={videoUrl} target="_blank" rel="noopener noreferrer"
                     className="flex min-h-20 items-center justify-center gap-3 text-sm font-medium text-white">{siteText(home,'product.videoCta')} <ArrowUpRight size={17}/></a>}
