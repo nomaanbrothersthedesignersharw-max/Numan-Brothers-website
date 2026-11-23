@@ -45,7 +45,7 @@ function CatalogueSkeleton() {
 
 /** Public catalogue is read-only. All editorial mutations happen in the authenticated studio. */
 export default function App() {
-  const { path, url, navigate } = useStoreHistory();
+  const { path, url, navigate, isPending } = useStoreHistory();
   const isStudioPath = path === '/studio' || path.startsWith('/studio/');
   const [siteData, setSiteData] = useState<PublishedData>({
     products: [], homepage: HOME_TEMPLATE, categories: [], error: null,
@@ -100,7 +100,31 @@ export default function App() {
     return ()=>{active=false};
   },[path,searchQuery,page,sort,customizableOnly]);
   const activeRoutePage = routeResult?.key===routeKey ? routeResult.data : null;
-  const matches = activeRoutePage?.products || [];
+  const fallbackCollectionProducts = useMemo(() => {
+    if (!collection) return [];
+    return published.filter((p) => {
+      if (collection.path === '/men') return p.department === 'men';
+      if (collection.path === '/kids') return p.department === 'kids';
+      return p.category === collection.path || p.category.startsWith(collection.path + '/');
+    });
+  }, [collection, published]);
+  const instantSearchMatches = useMemo(() => {
+    if (path !== '/search') return [];
+    if (!searchQuery) return published;
+    const q = searchQuery.toLowerCase();
+    return published.filter((p) => {
+      const title = (p.title || '').toLowerCase();
+      const sku = (p.sku || '').toLowerCase();
+      const desc = (p.description || '').toLowerCase();
+      const category = (p.category || '').toLowerCase();
+      return title.includes(q) || sku.includes(q) || desc.includes(q) || category.includes(q);
+    });
+  }, [path, searchQuery, published]);
+  const searchResults = activeRoutePage ? activeRoutePage.products : instantSearchMatches;
+  const searchCount = activeRoutePage ? activeRoutePage.count : instantSearchMatches.length;
+  const matches = path === '/search' ? searchResults : (activeRoutePage ? activeRoutePage.products : fallbackCollectionProducts);
+  const totalCount = path === '/search' ? searchCount : (activeRoutePage ? activeRoutePage.count : fallbackCollectionProducts.length);
+  const pageSize = activeRoutePage ? activeRoutePage.pageSize : 12;
   const memoryProduct = useMemo(() => {
     if (!selectedId) return undefined;
     return published.find(p => p.id === selectedId || p.slug === selectedId || p.sku === selectedId)
@@ -128,6 +152,13 @@ export default function App() {
   }
 
   return <div className="min-h-screen bg-[#fbf8f2]">
+    {isPending && (
+      <div
+        role="progressbar"
+        aria-label="Loading page"
+        className="fixed top-0 left-0 right-0 z-[9999] h-[2.5px] bg-gradient-to-r from-[#b38a4d] via-[#f7e7c4] to-[#b38a4d] animate-pulse shadow-[0_0_8px_rgba(179,138,77,0.5)]"
+      />
+    )}
     <Helmet>
       {selectedId===SAMPLE_SHERWANI.slug&&<meta name="robots" content="noindex, nofollow"/>}
       <title>{`${title} | ${siteText(siteData.homepage,'seo.brand')}`}</title>
@@ -144,14 +175,13 @@ export default function App() {
       </div>}
       <Suspense fallback={<CatalogueSkeleton/>}>
       {path === '/' ? <V2Home products={published} home={siteData.homepage} categories={siteData.categories} onNavigate={navigate}/> :
-       collection ? (activeRoutePage ? <V2Collection route={collection} products={matches}
+       collection ? <V2Collection route={collection} products={matches}
          bannerImage={categoryOverride?.image_url && isSafeHttps(categoryOverride.image_url) ? categoryOverride.image_url : undefined}
-         home={siteData.homepage} categories={siteData.categories} totalCount={activeRoutePage.count}
-         page={page} pageSize={activeRoutePage.pageSize} onPageChange={setPage}
+         home={siteData.homepage} categories={siteData.categories} totalCount={totalCount}
+         page={page} pageSize={pageSize} onPageChange={setPage}
          sort={sort} onSortChange={(s) => { setPage(0); setSort(s); }}
          customizableOnly={customizableOnly} onCustomizableChange={(v) => { setPage(0); setCustomizableOnly(v); }}
          onNavigate={navigate}/> :
-         <CatalogueSkeleton/>) :
        selectedId && !product && selectedId!==SAMPLE_SHERWANI.slug ? <CatalogueSkeleton/> :
        product ? <V2Product key={product.id} product={product} home={siteData.homepage}
          whatsappNumber={siteData.homepage.contactWhatsapp} contactPhone={siteData.homepage.contactPhone} onNavigate={navigate}/> :
@@ -159,9 +189,9 @@ export default function App() {
          <V2Reveal>
            <p className="mb-5 text-[10px] font-bold uppercase tracking-[.24em] text-[#a37f50]">{siteText(siteData.homepage,'search.eyebrow')}</p>
            <h1 className="break-words font-serif text-[clamp(2.4rem,6vw,5.5rem)] tracking-[-.05em] text-[#29221c]">{siteText(siteData.homepage,'search.title')}</h1>
-           <p className="mt-5 mb-12 text-sm text-[#817164]">{searchQuery ? 'Results for "' + searchQuery + '"' : 'Enter a product name or browse a collection.'} · {activeRoutePage?.count ?? '—'} styles</p>
+           <p className="mt-5 mb-12 text-sm text-[#817164]">{searchQuery ? 'Results for "' + searchQuery + '"' : 'Enter a product name or browse a collection.'} · {totalCount} styles</p>
          </V2Reveal>
-         {!activeRoutePage ? <p role="status">Searching catalogue…</p> : matches.length ? <V2ProductGrid products={matches} home={siteData.homepage} onNavigate={navigate}/> :
+         {matches.length ? <V2ProductGrid products={matches} home={siteData.homepage} onNavigate={navigate}/> :
           <div className="border border-[#e4d5c2] bg-[#f5ece0] px-7 py-14 text-center">
             <h2 className="font-serif text-3xl">{siteText(siteData.homepage,'search.emptyTitle')}</h2>
             <p className="mt-4 text-sm leading-7 text-[#766b5e]">{siteText(siteData.homepage,'search.emptyText')}</p>

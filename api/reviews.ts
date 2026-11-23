@@ -32,12 +32,22 @@ export default {
     try {
       const filter = productId ? `&product_id=eq.${encodeURIComponent(productId)}` : '';
       let res = await fetch(
-        `${url}/rest/v1/nb_reviews?select=id,display_name,rating,comment,created_at,product_id&status=eq.approved${filter}&order=approved_at.desc&limit=12`,
+        `${url}/rest/v1/nb_reviews?select=id,display_name,rating,comment,created_at,product_id,photo_urls&status=eq.approved${filter}&order=approved_at.desc&limit=12`,
         {
           headers: { apikey: key, Accept: 'application/json' },
           signal: AbortSignal.timeout(7000),
         },
       );
+      if (res.status === 400) {
+        // Fallback without photo_urls if migration is pending
+        res = await fetch(
+          `${url}/rest/v1/nb_reviews?select=id,display_name,rating,comment,created_at,product_id&status=eq.approved${filter}&order=approved_at.desc&limit=12`,
+          {
+            headers: { apikey: key, Accept: 'application/json' },
+            signal: AbortSignal.timeout(7000),
+          },
+        );
+      }
       if (res.status === 400 && !productId) {
         // Pre-migration fallback without product_id column
         res = await fetch(

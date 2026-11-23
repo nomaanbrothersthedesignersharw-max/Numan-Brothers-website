@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, ChevronLeft, ChevronRight, MessageCircle, Play, ShoppingBag, Sparkles, Star, Scissors, X, ZoomIn } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, Bookmark, Camera, ChevronLeft, ChevronRight, MessageCircle, Play, ShoppingBag, Sparkles, Star, Scissors, X, ZoomIn } from 'lucide-react';
 import type { Product } from '../types';
 import { productImage, productPath, type CatalogProduct } from '../storefront/catalog';
 import { toggleShortlistItem, useShortlist } from '../storefront/shortlist';
@@ -12,6 +12,7 @@ import V2Link from './V2Link';
 import V2Reveal from './V2Reveal';
 import { optimizedImageUrl, type CmsHome } from '../lib/cmsData';
 import {siteText} from '../lib/siteContent';
+import { compressReviewPhoto } from '../lib/imageCompress';
 
 interface Props {product:Product;whatsappNumber?:string;contactPhone?:string;home?:CmsHome;onNavigate:(path:string)=>void;}
 
@@ -30,7 +31,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   const [shareStatus,setShareStatus]=useState('');
   const [related,setRelated]=useState<CatalogProduct[]>([]);
   const [zoomOpen, setZoomOpen] = useState(false);
-  const [reviews, setReviews] = useState<{ id: string; display_name: string; rating: number; comment: string; created_at: string }[]>([]);
+  const [reviews, setReviews] = useState<{ id: string; display_name: string; rating: number; comment: string; created_at: string; photo_urls?: string[] }[]>([]);
   const [avgRating, setAvgRating] = useState(0);
   const [revName, setRevName] = useState('');
   const [revRating, setRevRating] = useState(5);
@@ -38,6 +39,9 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   const [revWebsite, setRevWebsite] = useState('');
   const [revStatus, setRevStatus] = useState('');
   const [revBusy, setRevBusy] = useState(false);
+  const [revPhotos, setRevPhotos] = useState<{ dataUrl: string; sizeBytes: number; name: string }[]>([]);
+  const [revPhotoCompressing, setRevPhotoCompressing] = useState(false);
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
   const shortlist = useShortlist();
   const isSaved = shortlist.some((item) => item.id === garment.id);
   useEffect(() => {
@@ -97,6 +101,34 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   const videoUrl = videoList[selectedVideo] || videoList[0];
   const playableVideo = typeof videoUrl === 'string' && /^https:\/\//i.test(videoUrl) &&
     (/\.(mp4|webm)(\?|$)/i.test(videoUrl) || videoUrl.includes('/storage/v1/object/public/nb-media-public/'));
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const remainingSlots = 3 - revPhotos.length;
+    if (remainingSlots <= 0) {
+      setRevStatus('Maximum 3 photos allowed.');
+      return;
+    }
+    const toProcess = Array.from(files).slice(0, remainingSlots);
+    setRevPhotoCompressing(true);
+    try {
+      const compressedList = await Promise.all(
+        toProcess.map((f) => compressReviewPhoto(f, 1200, 90_000))
+      );
+      setRevPhotos((prev) => [...prev, ...compressedList]);
+      setRevStatus('');
+    } catch {
+      setRevStatus('Could not process some photos. Please try different images.');
+    } finally {
+      setRevPhotoCompressing(false);
+      e.target.value = '';
+    }
+  };
+
+  const removePhoto = (idx: number) => {
+    setRevPhotos((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const submitProductReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (revWebsite) { setRevStatus('Thank you.'); return; }
@@ -108,7 +140,14 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
       const res = await fetch('/api/submit-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ display_name: revName.trim(), rating: revRating, comment: revComment.trim(), product_id: garment.id, website: revWebsite }),
+        body: JSON.stringify({
+          display_name: revName.trim(),
+          rating: revRating,
+          comment: revComment.trim(),
+          product_id: garment.id,
+          website: revWebsite,
+          photos: revPhotos.map((p) => p.dataUrl),
+        }),
       });
       if (res.status !== 404) {
         const d = await res.json().catch(() => ({})) as { error?: string; code?: string };
@@ -117,7 +156,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
           setRevStatus(res.status === 409 || d.code === '23505' ? 'This review has already been submitted.' : (d.error || 'Unable to submit.'));
           return;
         }
-        setRevName(''); setRevComment(''); setRevRating(5);
+        setRevName(''); setRevComment(''); setRevRating(5); setRevPhotos([]);
         setRevStatus('Submitted for moderation. Your star review will appear once approved.');
         return;
       }
@@ -126,10 +165,11 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
     if (!client) { setRevBusy(false); setRevStatus('Review submissions are currently unavailable.'); return; }
     const { error } = await client.from('nb_reviews').insert({
       display_name: revName.trim(), rating: revRating, comment: revComment.trim(), product_id: garment.id,
+      photo_urls: revPhotos.map((p) => p.dataUrl),
     });
     setRevBusy(false);
     if (error) setRevStatus(error.code === '23505' ? 'This review has already been submitted.' : 'Unable to submit. Please try again.');
-    else { setRevName(''); setRevComment(''); setRevRating(5); setRevStatus('Submitted for moderation. Your star review will appear once approved.'); }
+    else { setRevName(''); setRevComment(''); setRevRating(5); setRevPhotos([]); setRevStatus('Submitted for moderation. Your star review will appear once approved.'); }
   };
   const call = callingContact(contactPhone);
   const original=garment.originalPrice??null;
@@ -423,6 +463,29 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
                     ))}
                   </div>
                   <p className="mt-4 whitespace-pre-line break-words text-sm leading-7 text-[#3b3026]">“{item.comment}”</p>
+                  {item.photo_urls && item.photo_urls.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {item.photo_urls.map((photo, pIdx) => (
+                        <button
+                          key={pIdx}
+                          type="button"
+                          onClick={() => setLightboxPhoto(photo)}
+                          className="group relative h-16 w-16 overflow-hidden rounded-lg border border-stone-200 bg-stone-100 transition hover:border-[#b38a4d] sm:h-20 sm:w-20"
+                          title="Click to view customer photo"
+                        >
+                          <img
+                            src={photo}
+                            alt={`${item.display_name} wearing this design`}
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
+                            <ZoomIn size={16} className="text-white opacity-0 transition group-hover:opacity-100" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <footer className="mt-5 border-t border-stone-200 pt-3 text-xs font-semibold text-[#6b5640]">{item.display_name}</footer>
                 </blockquote>
               ))}
@@ -448,6 +511,47 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
                 placeholder="Share fabric feel, fit, and tailoring experience…"
                 className="mt-2 block w-full rounded-md border border-stone-300 p-3 text-base sm:text-sm" />
             </label>
+            <div className="sm:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="review-photo-input" className="flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-stone-800">
+                  <Camera size={15} className="text-[#a17c4f]" />
+                  Add customer photos <span className="font-normal text-stone-500">(wearing this garment, up to 3 photos)</span>
+                </label>
+                <span className="text-[11px] text-stone-500">{revPhotos.length}/3 attached</span>
+              </div>
+              <input
+                id="review-photo-input"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => void handlePhotoUpload(e)}
+                disabled={revBusy || revPhotoCompressing || revPhotos.length >= 3}
+                className="mt-2 block w-full text-xs text-stone-500 file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-[#f2e7d7] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[#4a3a29] hover:file:bg-[#e7d5bd] disabled:opacity-50"
+              />
+              {revPhotoCompressing && (
+                <p className="mt-1 text-xs text-amber-700 animate-pulse">Optimizing photo for fast delivery…</p>
+              )}
+              {revPhotos.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {revPhotos.map((photo, idx) => (
+                    <div key={idx} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
+                      <img src={photo.dataUrl} alt="Review upload preview" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(idx)}
+                        className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white hover:bg-black"
+                        title="Remove photo"
+                      >
+                        <X size={12} />
+                      </button>
+                      <span className="absolute inset-x-0 bottom-0 bg-black/60 py-0.5 text-center text-[9px] text-white">
+                        {Math.round(photo.sizeBytes / 1024)} KB
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <label className="absolute -left-[10000px]" aria-hidden="true">Website
               <input tabIndex={-1} autoComplete="off" value={revWebsite} onChange={(e) => setRevWebsite(e.target.value)} />
             </label>
@@ -483,6 +587,27 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
           </>
         )}
         <img src={visual} alt={product.title} className="max-h-[90vh] max-w-[92vw] rounded object-contain shadow-2xl" />
+      </div>
+    )}
+    {lightboxPhoto && (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Customer review photo"
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md"
+        onClick={() => setLightboxPhoto(null)}
+      >
+        <button
+          type="button"
+          onClick={() => setLightboxPhoto(null)}
+          className="absolute right-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/60 text-white hover:bg-white hover:text-black"
+          aria-label="Close customer photo"
+        >
+          <X size={22} />
+        </button>
+        <div className="relative max-h-[90vh] max-w-[90vw] overflow-hidden rounded-xl bg-black" onClick={(e) => e.stopPropagation()}>
+          <img src={lightboxPhoto} alt="Customer review photograph enlarged" className="max-h-[85vh] w-auto max-w-full object-contain" />
+        </div>
       </div>
     )}
   </div>;
