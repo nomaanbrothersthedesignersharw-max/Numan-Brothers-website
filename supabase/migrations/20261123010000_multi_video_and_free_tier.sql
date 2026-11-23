@@ -18,7 +18,7 @@ returns trigger
 language plpgsql
 security invoker
 set search_path = ''
-as $sync_videos$
+as $$
 declare
   draft_videos jsonb;
   parsed text[] := '{}';
@@ -50,7 +50,7 @@ begin
 
   return new;
 end;
-$sync_videos$;
+$$;
 
 drop trigger if exists nb_sync_product_video_urls_trg on public.nb_products;
 create trigger nb_sync_product_video_urls_trg
