@@ -1,13 +1,14 @@
 import React,{useEffect,useState} from 'react';
-import {ArrowUpRight,Star} from 'lucide-react';
+import {ArrowUpRight,Star,X,ZoomIn} from 'lucide-react';
 import {getCmsClient} from '../lib/supabaseClient';
-type Review={id:string;display_name:string;rating:number;comment:string;created_at:string};
+type Review={id:string;display_name:string;rating:number;comment:string;created_at:string;photo_urls?:string[]};
 const reviewSource='https://www.justdial.com/Warangal/Nomans-Bros-Opp-Madrasi-Masjid-Mandi-Bazaar/9999PX870-X870-131215171002-P7L6_BZDET';
 export default function V2Reviews(){
  const client=getCmsClient();
  const [rows,setRows]=useState<Review[]>([]);
  const [name,setName]=useState(''),[comment,setComment]=useState(''),[rating,setRating]=useState(5);
  const [website,setWebsite]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
+ const [lightboxPhoto,setLightboxPhoto]=useState<string|null>(null);
  useEffect(()=>{
    let active=true;
    const load=async()=>{
@@ -19,8 +20,14 @@ export default function V2Reviews(){
        }
      }catch{/* Fallback to direct Supabase query in local dev */}
      if(!client)return;
-     const {data,error}=await client.from('nb_reviews').select('id,display_name,rating,comment,created_at')
+     let {data,error}=await client.from('nb_reviews').select('id,display_name,rating,comment,created_at,photo_urls')
        .eq('status','approved').order('created_at',{ascending:false}).limit(6);
+     if(error){
+       const fb=await client.from('nb_reviews').select('id,display_name,rating,comment,created_at')
+         .eq('status','approved').order('created_at',{ascending:false}).limit(6);
+       data=fb.data as typeof data;
+       error=fb.error;
+     }
      if(active&&!error)setRows((data||[]) as Review[]);
    };
    void load();
@@ -55,7 +62,7 @@ export default function V2Reviews(){
        headers:{'Content-Type':'application/json',Accept:'application/json'},
        body:JSON.stringify({display_name:subName,rating:subRating,comment:subComment,website}),
      });
-     if(res.status!==404){
+     if(res.status!==404&&res.status<500){
        const data=await res.json().catch(()=>({})) as {error?:string;code?:string};
        setBusy(false);
        if(!res.ok){
@@ -90,6 +97,29 @@ export default function V2Reviews(){
              className={i<item.rating?'fill-[#af8251] text-[#af8251]':'text-stone-300'}/>)}
          </div>
          <p className="mt-5 whitespace-pre-line break-words text-sm leading-7">“{item.comment}”</p>
+         {item.photo_urls&&item.photo_urls.length>0&&(
+           <div className="mt-4 flex flex-wrap gap-2">
+             {item.photo_urls.map((photo,pIdx)=>(
+               <button
+                 key={pIdx}
+                 type="button"
+                 onClick={()=>setLightboxPhoto(photo)}
+                 className="group relative h-16 w-16 overflow-hidden rounded-lg border border-stone-200 bg-stone-100 transition hover:border-[#b38a4d] sm:h-20 sm:w-20"
+                 title="Click to view customer photo"
+               >
+                 <img
+                   src={photo}
+                   alt={`${item.display_name} customer photograph`}
+                   className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                   loading="lazy"
+                 />
+                 <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
+                   <ZoomIn size={16} className="text-white opacity-0 transition group-hover:opacity-100"/>
+                 </div>
+               </button>
+             ))}
+           </div>
+         )}
          <footer className="mt-6 border-t border-stone-200 pt-4 text-xs font-semibold">{item.display_name} · Website submission</footer>
        </blockquote>)}
      </div>:<p className="mt-10 rounded-xl border border-dashed border-[#bca484] bg-[#f8f3eb] p-6 text-sm leading-7">
@@ -128,5 +158,26 @@ export default function V2Reviews(){
        </form>
      </div>
    </div>
+   {lightboxPhoto&&(
+     <div
+       role="dialog"
+       aria-modal="true"
+       aria-label="Customer review photo"
+       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md"
+       onClick={()=>setLightboxPhoto(null)}
+     >
+       <button
+         type="button"
+         onClick={()=>setLightboxPhoto(null)}
+         className="absolute right-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-black/60 text-white hover:bg-white hover:text-black"
+         aria-label="Close customer photo"
+       >
+         <X size={22}/>
+       </button>
+       <div className="relative max-h-[90vh] max-w-[90vw] overflow-hidden rounded-xl bg-black" onClick={e=>e.stopPropagation()}>
+         <img src={lightboxPhoto} alt="Customer review photograph enlarged" className="max-h-[85vh] w-auto max-w-full object-contain"/>
+       </div>
+     </div>
+   )}
  </section>;
 }

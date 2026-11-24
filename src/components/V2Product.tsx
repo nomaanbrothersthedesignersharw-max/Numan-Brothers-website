@@ -70,10 +70,25 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
         }catch{/**/}
         const client=getCmsClient();
         if(!client)return;
-        const {data,error}=await client.from('nb_reviews').select('id,display_name,rating,comment,created_at')
-          .eq('status','approved').eq('product_id',garment.id).order('created_at',{ascending:false}).limit(12);
+        let {data,error}=await client.from('nb_reviews')
+          .select('id,display_name,rating,comment,created_at,product_id,photo_urls')
+          .eq('status','approved')
+          .or(`product_id.eq.${garment.id},product_id.is.null`)
+          .order('created_at',{ascending:false}).limit(24);
+        if(error){
+          const fb=await client.from('nb_reviews')
+            .select('id,display_name,rating,comment,created_at')
+            .eq('status','approved').eq('product_id',garment.id)
+            .order('created_at',{ascending:false}).limit(12);
+          data=fb.data as typeof data;
+          error=fb.error;
+        }
         if(active&&!error&&Array.isArray(data)){
-          const list=data as typeof reviews;
+          const raw=data as (typeof reviews[number] & {product_id?:string|null})[];
+          const list=raw.filter(r=>
+            r.product_id===garment.id ||
+            (r.product_id==null && garment.id==='788f30aa-6d01-43a8-a345-9ae15074cc3e' && r.id==='08981c6a-a99c-4d77-95eb-28f9f02cc0db')
+          ).slice(0,12);
           setReviews(list);
           setAvgRating(list.length?Number((list.reduce((s,r)=>s+r.rating,0)/list.length).toFixed(1)):0);
         }
@@ -170,7 +185,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
           photos: subPhotos,
         }),
       });
-      if (res.status !== 404) {
+      if (res.status !== 404 && res.status < 500) {
         const d = await res.json().catch(() => ({})) as { error?: string; code?: string };
         setRevBusy(false);
         if (!res.ok) {

@@ -31,7 +31,7 @@ export default {
         });
       }catch{return new Response('Demo temporarily unavailable',{status:503});}
     }
-    const isUuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle);
+    const isUuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle);
     const isSku=/^NB-[A-Z]{2,3}-[0-9]{5}$/.test(handle);
     const headers={
       'Content-Type':'text/html; charset=utf-8',

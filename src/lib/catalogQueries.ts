@@ -107,7 +107,7 @@ export async function loadCataloguePage(
     count:count||0,page,pageSize:PUBLIC_PAGE_SIZE,error:null,
   });
 }
-const isUuid=(handle:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle);
+const isUuid=(handle:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(handle);
 const isSku=(handle:string)=>/^NB-[A-Z]{2,3}-[0-9]{5}$/.test(handle);
 export const isValidProductHandle=(handle:string):boolean =>
   handle.length<=120 && (isUuid(handle)||isSku(handle)||/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(handle));

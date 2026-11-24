@@ -7,7 +7,7 @@ const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || 'sb_publishable
 const baseCols =
   'id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,price,offer_price,customizable,status,sort_rank,created_at,updated_at';
 
-const isUuid = (h: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(h);
+const isUuid = (h: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(h);
 const isSku = (h: string) => /^NB-[A-Z]{2,3}-[0-9]{5}$/.test(h);
 const isValidHandle = (h: string) =>
   h.length > 0 && h.length <= 120 && (isUuid(h) || isSku(h) || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(h));

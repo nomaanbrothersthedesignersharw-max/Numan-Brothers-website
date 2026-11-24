@@ -43,8 +43,8 @@ export default {
       return new Response(JSON.stringify({ error: 'Too many submissions. Please try again later.' }), { status: 429, headers });
     }
 
-    const api = process.env.VITE_SUPABASE_URL?.trim() || '';
-    const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || '';
+    const api = process.env.VITE_SUPABASE_URL?.trim() || 'https://uinhybkdzevpxnugtvzf.supabase.co';
+    const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || 'sb_publishable_h3Bat2XRHgWACqz-kxCdww_NZsSjO_q';
     if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(api) || !/^sb_publishable_[A-Za-z0-9_-]{12,}$/.test(key)) {
       return new Response(JSON.stringify({ error: 'Review service unavailable.' }), { status: 503, headers });
     }
@@ -82,16 +82,20 @@ export default {
     const displayName = typeof body.display_name === 'string' ? body.display_name.trim() : '';
     const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
     const rating = Number(body.rating);
-    const productId = typeof body.product_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.product_id.trim())
+    const productId = typeof body.product_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.product_id.trim())
       ? body.product_id.trim()
       : null;
     const rawPhotos = Array.isArray(body.photos)
       ? body.photos
       : (Array.isArray(body.photo_urls) ? body.photo_urls : []);
     const validPhotos = rawPhotos
-      .filter((p): p is string => typeof p === 'string' && (p.startsWith('data:image/webp;base64,') || /^https:\/\//i.test(p)))
+      .filter(
+        (p): p is string =>
+          typeof p === 'string' &&
+          (/^data:image\/(webp|jpeg|jpg|png);base64,/i.test(p) || /^https:\/\//i.test(p)),
+      )
       .slice(0, 3)
-      .filter(p => p.length <= 135_000);
+      .filter((p) => p.length <= 350_000);
 
     if (
       displayName.length < 2 || displayName.length > 70 ||
