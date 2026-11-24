@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ArrowLeft, ArrowRight, Plus, Save, Send, Archive, Trash2 } from 'lucide-react';
-import { type CmsProductRow, isSafeHttps, mediaPublicUrl } from '../../lib/cmsData';
+import { type CmsProductRow, isSafeHttps } from '../../lib/cmsData';
 import { COLLECTION_ROUTES } from '../../storefront/navigation';
 import { productPath } from '../../storefront/catalog';
 import AssetEditor from './AssetEditor';
-import {ErrorText,Field,inputClass,outlineClass,primaryClass,invokeMediaAction} from './StudioShared';
+import {ErrorText,Field,inputClass,outlineClass,permanentlyDeleteMedia,primaryClass} from './StudioShared';
 
 interface Props {client:SupabaseClient;userId:string;canPublish:boolean;}
 interface Draft {
@@ -219,8 +219,13 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     );
     if(!confirmed)return;
 
-    const alsoDeleteImages=form.imageUrls.length>0&&window.confirm(
-      `Do you also want to permanently delete this product's ${form.imageUrls.length} image(s) from Supabase Storage?`
+    const allMediaUrls=Array.from(new Set([
+      ...form.imageUrls,
+      ...form.videoUrls,
+      ...(form.videoUrl?[form.videoUrl]:[]),
+    ].filter(Boolean)));
+    const alsoDeleteMedia=allMediaUrls.length>0&&window.confirm(
+      `Do you also want to permanently delete this product's ${allMediaUrls.length} image(s) and video(s) from Supabase Storage?`
     );
 
     setBusy(true);setError(null);setMessage(null);
@@ -232,17 +237,10 @@ export default function CmsProducts({client,userId,canPublish}:Props){
         if(fallbackError)throw new Error(rpcError.message||fallbackError.message);
       }
 
-      if(alsoDeleteImages){
-        for(const imgUrl of form.imageUrls){
+      if(alsoDeleteMedia){
+        for(const mediaUrl of allMediaUrls){
           try{
-            const prefix=mediaPublicUrl('');
-            if(prefix&&imgUrl.startsWith(prefix)){
-              const storagePath=decodeURIComponent(imgUrl.slice(prefix.length)).replace(/^\/+/,'');
-              const {data:asset}=await client.from('nb_media').select('id').eq('storage_path',storagePath).maybeSingle();
-              if(asset?.id){
-                await invokeMediaAction(client,asset.id as string,'delete');
-              }
-            }
+            await permanentlyDeleteMedia(client,{url:mediaUrl});
           }catch{
             // best-effort cleanup
           }

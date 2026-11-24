@@ -5,7 +5,7 @@ import type {CmsMediaRow} from '../../lib/cmsData';
 import {mediaPublicUrl} from '../../lib/cmsData';
 import {uploadCmsFile,checkMediaFile} from '../../lib/cmsUpload';
 import {COLLECTION_ROUTES} from '../../storefront/navigation';
-import {ErrorText,inputClass,invokeMediaAction,labelClass,outlineClass} from './StudioShared';
+import {ErrorText,inputClass,invokeMediaAction,labelClass,outlineClass,permanentlyDeleteMedia} from './StudioShared';
 
 const MEDIA_COLS='id,storage_path,original_name,mime_type,size_bytes,alt_text,department,category_path,archived_at,approved,uploaded_by,created_at';
 type Dept='men'|'kids'|'';
@@ -94,30 +94,16 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
   };
   const deleteFromDatabase=async(rawUrl:string,assetId?:string)=>{
     if(!canPublish)return;
-    if(!window.confirm('Permanently DELETE this file from both Supabase Storage and the database?\n\nIf it is used by a published page or saved draft, deletion will be refused. This cannot be undone.'))return;
+    if(!window.confirm('Permanently DELETE this '+(allowVideo?'video':'image')+' from both Supabase Storage and the database?\n\nAny references to it will be automatically unlinked. This cannot be undone.'))return;
     const url=rawUrl.split('?')[0];
     setDeletingUrl(rawUrl);setError(null);setNotice(null);
     try{
-      let id=assetId;
-      if(!id){
-        const prefix=mediaPublicUrl('');
-        if(!prefix || !url.startsWith(prefix))throw new Error('Only files from this store\'s Media library can be permanently deleted.');
-        const storagePath=decodeURIComponent(url.slice(prefix.length)).replace(/^\/+/,'');
-        if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png|webp|avif|gif|mp4|webm)$/i.test(storagePath))
-          throw new Error('This media file needs manual review before deletion.');
-        const {data:asset,error:findError}=await client.from('nb_media')
-          .select('id').eq('storage_path',storagePath).maybeSingle();
-        if(findError)throw findError;
-        if(!asset)throw new Error('Media record not found. Refresh the library.');
-        id=asset.id as string;
-      }
-      await invokeMediaAction(client, id, 'delete');
       onChange(selected.filter(x=>x.split('?')[0]!==url));
-      setNotice('File permanently removed from Supabase Storage and its media database record.');
+      await permanentlyDeleteMedia(client, { id: assetId, url });
+      setNotice((allowVideo?'Video':'Image')+' permanently removed from Supabase Storage and its media database record.');
       setReload(n=>n+1);onUploaded?.();
     }catch(cause){
-      setError((cause instanceof Error?cause.message:'Deletion failed.')+
-        ' If this image is live, first remove it from the page, Save draft and Publish website changes. Then delete it here or in Media.');
+      setError(cause instanceof Error?cause.message:'Deletion failed.');
     }finally{setDeletingUrl(null);}
   };
   const move=(index:number,target:number)=>{
@@ -139,10 +125,10 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
         onDrop={e=>{e.preventDefault();const raw=e.dataTransfer.getData('text/x-nb-selected-index');
           if(raw!=='' && /^\d+$/.test(raw))move(Number(raw),index)}}
         className="relative overflow-hidden rounded-md border border-amber-300 bg-stone-100">
-        {allowVideo?<div className="flex aspect-[4/3] items-center justify-center bg-stone-900 text-white"><Video size={30}/></div>:
+        {allowVideo?<video preload="metadata" controls src={url} className="aspect-[4/3] w-full bg-stone-950 object-cover"/>:
           <img className="aspect-[4/3] w-full object-cover" alt={'Selected '+label} src={url} loading="lazy"/>}
         <div className="flex flex-wrap items-center justify-between gap-1 bg-white p-2">
-          <span className="inline-flex min-w-0 items-center text-[11px] text-stone-600">{multiple&&<GripVertical size={13}/>} {index===0?'Cover':'Image '+(index+1)}</span>
+          <span className="inline-flex min-w-0 items-center text-[11px] text-stone-600">{multiple&&<GripVertical size={13}/>} {allowVideo?'Video '+(index+1):(index===0?'Cover':'Image '+(index+1))}</span>
           {multiple&&<button type="button" aria-label="Move selected photo up" disabled={index===0} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md disabled:opacity-40" onClick={()=>move(index,index-1)}><ArrowUp size={16}/></button>}
           {multiple&&<button type="button" aria-label="Move selected photo down" disabled={index===selected.length-1} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md disabled:opacity-40" onClick={()=>move(index,index+1)}><ArrowDown size={16}/></button>}
           <button type="button" aria-label={'Remove '+label+' '+(index+1)+' from this draft'} title="Remove from this section only (keep the original in Media)" className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-md text-red-700 hover:bg-red-50"

@@ -4,7 +4,7 @@ import {ImagePlus,CheckCircle2,Upload,Archive,Trash2,RotateCcw} from 'lucide-rea
 import {COLLECTION_ROUTES} from '../../storefront/navigation';
 import { type CmsMediaRow, mediaPublicUrl } from '../../lib/cmsData';
 import { uploadCmsFile } from '../../lib/cmsUpload';
-import { ErrorText, inputClass, invokeMediaAction, outlineClass, primaryClass } from './StudioShared';
+import { ErrorText, inputClass, invokeMediaAction, outlineClass, permanentlyDeleteMedia, primaryClass } from './StudioShared';
 
 interface Props { client: SupabaseClient; userId:string; canPublish:boolean; onMediaChange:()=>void; }
 export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props) {
@@ -110,10 +110,10 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
   };
   const deleteMedia=async(asset:CmsMediaRow)=>{
     if(!canPublish)return;
-    if(!window.confirm('Permanently erase this image/video from Supabase Storage AND its database record? This cannot be undone. Referenced live assets cannot be erased.'))return;
+    if(!window.confirm('Permanently erase this image/video from Supabase Storage AND its database record? Any draft or page links to it will be unlinked automatically. This cannot be undone.'))return;
     setBusyId(asset.id);setError(null);
     try{
-      await invokeMediaAction(client, asset.id, 'delete');
+      await permanentlyDeleteMedia(client, { id: asset.id, storagePath: asset.storage_path });
       await refresh();onMediaChange();
     }catch(cause){setError(cause instanceof Error?cause.message:'File deletion failed.');}
     finally{setBusyId(null);}
