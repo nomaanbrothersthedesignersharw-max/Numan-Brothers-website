@@ -14,6 +14,7 @@ function safeSearch(value: string): string {
 
 export default {
   async fetch(request: Request): Promise<Response> {
+    const startedAt = Date.now();
     if (request.method !== 'GET') {
       return new Response('Method not allowed', { status: 405 });
     }
@@ -116,6 +117,7 @@ export default {
           headers: {
             ...headers,
             'Cache-Control': q ? 'public, s-maxage=30, stale-while-revalidate=300' : 'public, s-maxage=60, stale-while-revalidate=600',
+            'Server-Timing': `edge;dur=${Date.now() - startedAt}`,
           },
         },
       );

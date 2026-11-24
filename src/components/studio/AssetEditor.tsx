@@ -3,7 +3,7 @@ import type {SupabaseClient} from '@supabase/supabase-js';
 import {ArrowDown,ArrowUp,CloudUpload,ImagePlus,Pencil,Trash2,Video,GripVertical} from 'lucide-react';
 import type {CmsMediaRow} from '../../lib/cmsData';
 import {mediaPublicUrl} from '../../lib/cmsData';
-import {uploadCmsFile,checkMediaFile} from '../../lib/cmsUpload';
+import {uploadCmsFilesParallel,checkMediaFile} from '../../lib/cmsUpload';
 import {COLLECTION_ROUTES} from '../../storefront/navigation';
 import {ErrorText,inputClass,invokeMediaAction,labelClass,outlineClass,permanentlyDeleteMedia} from './StudioShared';
 
@@ -69,9 +69,11 @@ export default function AssetEditor({client,label,selected,onChange,multiple=fal
         if(allowVideo!==file.type.startsWith('video/'))
           throw new Error(allowVideo?'Choose MP4 or WebM video files.':'Choose JPG/PNG/WebP/AVIF/GIF photographs.');
         const validation=checkMediaFile(file);if(validation)throw new Error(validation);
-        const asset=await uploadCmsFile(client,file,userId,p=>setProgress(p),{
-          department:dept||null,categoryPath:category||null,
-        });
+      }
+      const uploaded=await uploadCmsFilesParallel(client,files,userId,p=>setProgress(p),{
+        department:dept||null,categoryPath:category||null,concurrency:3,
+      });
+      for(const asset of uploaded){
         if(canPublish){
           const {data,error}=await client.functions.invoke('nb-media-approval',{
             body:{id:asset.id,action:'approve'},

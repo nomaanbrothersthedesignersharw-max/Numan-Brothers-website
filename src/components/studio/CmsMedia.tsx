@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {ImagePlus,CheckCircle2,Upload,Archive,Trash2,RotateCcw} from 'lucide-react';
 import {COLLECTION_ROUTES} from '../../storefront/navigation';
 import { type CmsMediaRow, mediaPublicUrl } from '../../lib/cmsData';
-import { uploadCmsFile } from '../../lib/cmsUpload';
+import { uploadCmsFilesParallel } from '../../lib/cmsUpload';
 import { ErrorText, inputClass, invokeMediaAction, outlineClass, permanentlyDeleteMedia, primaryClass } from './StudioShared';
 
 interface Props { client: SupabaseClient; userId:string; canPublish:boolean; onMediaChange:()=>void; }
@@ -64,10 +64,12 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
     if(selection.length>100){setError('Choose up to 100 files here, or use Bulk imports for larger batches.');return;}
     setUploading(true);setError(null);
     try {
-      for (const file of Array.from(selection)) {
-        setProgress(0);
-        await uploadCmsFile(client,file,userId,setProgress,{department:uploadDept||null,categoryPath:uploadCategory||null});
-      }
+      setProgress(0);
+      await uploadCmsFilesParallel(client, Array.from(selection), userId, setProgress, {
+        department: uploadDept || null,
+        categoryPath: uploadCategory || null,
+        concurrency: 3,
+      });
       setSelection(null);setProgress(0);
       await refresh();
       onMediaChange();

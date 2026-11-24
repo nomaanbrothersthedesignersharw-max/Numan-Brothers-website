@@ -14,6 +14,7 @@ const isValidHandle = (h: string) =>
 
 export default {
   async fetch(request: Request): Promise<Response> {
+    const startedAt = Date.now();
     if (request.method !== 'GET') {
       return new Response('Method not allowed', { status: 405 });
     }
@@ -78,6 +79,7 @@ export default {
         headers: {
           ...headers,
           'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=600',
+          'Server-Timing': `edge;dur=${Date.now() - startedAt}`,
         },
       });
     } catch {

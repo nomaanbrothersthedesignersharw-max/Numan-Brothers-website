@@ -174,8 +174,86 @@ export async function uploadCmsFile(
     department:options?.department||null,category_path:options?.categoryPath||null,
   }).select(mediaSelectColumns).single();
   if (error || !data) {
+    // Best-effort cleanup of orphaned private upload when metadata insert fails on non-idempotent uploads
+    if (!options?.stableObjectId) {
+      await client.storage.from('nb-media-staging').remove([path]).catch(() => undefined);
+    }
     throw new Error('File uploaded, but saving metadata failed. Retry the same import to reconcile: ' +
       (error?.message || 'unknown database error'));
   }
   return data as CmsMediaRow;
+}
+
+/**
+ * Bounded concurrent worker pool preserving input order.
+ * Prevents saturating browser connections or Supabase Storage rate limits during bulk uploads.
+ */
+export async function runBoundedPool<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const limit = Math.max(1, Math.min(6, Math.floor(concurrency || 3)));
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+
+  const runWorker = async () => {
+    while (cursor < items.length) {
+      const idx = cursor++;
+      results[idx] = await worker(items[idx], idx);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => runWorker()));
+  return results;
+}
+
+/**
+ * Uploads multiple media files concurrently (default concurrency = 3) with transient retry
+ * and aggregated overall progress (0-100%).
+ */
+export async function uploadCmsFilesParallel(
+  client: SupabaseClient,
+  files: readonly File[],
+  userId: string,
+  onOverallProgress: (percent: number) => void,
+  options?: {
+    department?: 'men' | 'kids' | null;
+    categoryPath?: string | null;
+    concurrency?: number;
+    maxRetries?: number;
+  },
+): Promise<CmsMediaRow[]> {
+  if (!files.length) return [];
+  const perFile = new Array<number>(files.length).fill(0);
+  const emitOverall = () => {
+    const sum = perFile.reduce((a, b) => a + b, 0);
+    onOverallProgress(Math.round(sum / files.length));
+  };
+  const maxRetries = Math.max(0, Math.min(3, options?.maxRetries ?? 2));
+
+  return runBoundedPool(files, options?.concurrency ?? 3, async (file, idx) => {
+    let attempt = 0;
+    while (true) {
+      try {
+        const row = await uploadCmsFile(
+          client,
+          file,
+          userId,
+          (pct) => {
+            perFile[idx] = pct;
+            emitOverall();
+          },
+          { department: options?.department ?? null, categoryPath: options?.categoryPath ?? null },
+        );
+        perFile[idx] = 100;
+        emitOverall();
+        return row;
+      } catch (err) {
+        attempt += 1;
+        if (attempt > maxRetries) throw err;
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
+    }
+  });
 }
