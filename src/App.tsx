@@ -258,6 +258,89 @@ export default function App() {
            {contactCallUrl&&<a href={contactCallUrl}
              className="mt-6 inline-flex min-h-12 items-center gap-3 border border-[#e2c9a4] px-7 text-xs font-bold uppercase text-[#f8e9d0]">
              {siteText(siteData.homepage,'contact.call')} <ArrowUpRight size={16}/></a>}
+           <div className="mt-14 border-t border-[#5e4b38] pt-10">
+             <p className="text-[10px] font-bold uppercase tracking-[.26em] text-[#dcba85]">Three Showrooms · All in Mandi Bazar</p>
+             <h2 className="mt-3 font-serif text-[clamp(1.75rem,3.5vw,2.75rem)] leading-tight text-[#f8eddd]">
+               Visit any of our three Warangal showrooms
+             </h2>
+             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#d5c7b6]">
+               All three showrooms are conveniently located in Mandi Bazar, Warangal. Walk into whichever showroom is closest for in-person styling, trials, and custom tailoring.
+             </p>
+             <div className="mt-8 grid gap-5 md:grid-cols-3">
+               {[
+                 {
+                   badge: 'Heritage Showroom',
+                   name: 'Nomaan Brothers — Store 1',
+                   subtitle: 'Mandi Bazar Main Showroom',
+                   address: 'Mandi Bazar, JPN Road, Opp. Jamia / Madrasi Masjid, Sherpura, Warangal, Telangana 506002',
+                   note: 'Complete Men’s & Kids’ occasionwear — Sherwanis, Kurtas, Pathanis & bespoke fittings.',
+                   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Nomaan+Brothers+Dresses+Mandi+Bazar+Warangal',
+                   featured: false,
+                 },
+                 {
+                   badge: 'Mandi Bazar',
+                   name: 'Nomaan Brothers — Store 2',
+                   subtitle: 'Mandi Bazar Showroom',
+                   address: 'Mandi Bazar, Sherpura, Warangal, Telangana 506002',
+                   note: 'Tailored Suits, Blazers, Jodhpuris & festive ensembles for every family celebration.',
+                   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Nomaan+Brothers+Mandi+Bazar+Warangal',
+                   featured: false,
+                 },
+                 {
+                   badge: 'New Showroom',
+                   name: "Groom's Gallery",
+                   subtitle: 'By Nomaan Brothers · Mandi Bazar',
+                   address: 'Mandi Bazar, Opp. Madrasi Masjid, Warangal, Telangana 506002',
+                   note: 'Our newly launched showroom dedicated to Designer Wedding Sherwanis, Handwork Suits & Groom Couture.',
+                   mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Grooms+Gallery+Mandi+Bazar+Warangal',
+                   featured: true,
+                 },
+               ].map((store) => (
+                 <article
+                   key={store.name}
+                   className={
+                     'flex flex-col justify-between rounded-sm border p-6 transition-colors ' +
+                     (store.featured
+                       ? 'border-[#d6b27c] bg-[#342a21]/95 shadow-[0_18px_45px_-24px_rgba(226,201,164,0.35)]'
+                       : 'border-[#5a4736] bg-[#241e19]/85')
+                   }
+                 >
+                   <div>
+                     <span
+                       className={
+                         'inline-block rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[.2em] ' +
+                         (store.featured
+                           ? 'bg-[#e2c9a4] text-[#2b2118]'
+                           : 'border border-[#755e47] text-[#dcc29c]')
+                       }
+                     >
+                       {store.badge}
+                     </span>
+                     <h3 className="mt-4 font-serif text-2xl leading-snug text-[#faf0e2]">{store.name}</h3>
+                     <p className="mt-1 text-[11px] font-semibold uppercase tracking-[.16em] text-[#cfa976]">{store.subtitle}</p>
+                     <p className="mt-4 flex items-start gap-2 text-xs leading-6 text-[#ddd0c0]">
+                       <MapPin size={15} className="mt-0.5 shrink-0 text-[#dcba85]" />
+                       <span>{store.address}</span>
+                     </p>
+                     <p className="mt-3 text-xs leading-6 text-[#bfb09e]">{store.note}</p>
+                   </div>
+                   <a
+                     href={store.mapsUrl}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     className={
+                       'mt-6 inline-flex min-h-11 items-center justify-center gap-2 px-4 text-[11px] font-bold uppercase tracking-[.14em] transition-colors ' +
+                       (store.featured
+                         ? 'bg-[#e2c9a4] text-[#2b2118] hover:bg-[#ecd7b7]'
+                         : 'border border-[#8a7055] text-[#f4e4cb] hover:border-[#e2c9a4] hover:bg-[#332a22]')
+                     }
+                   >
+                     <MapPin size={14} /> Open in Google Maps <ArrowUpRight size={14} />
+                   </a>
+                 </article>
+               ))}
+             </div>
+           </div>
            <div className="mt-10 border-t border-[#786047] pt-6">
              <p className="text-xs font-semibold uppercase tracking-[.2em] text-[#e2bf8f]">Connect with us</p>
              <SocialLinks home={siteData.homepage} variant="dark" showUnconfigured/>
