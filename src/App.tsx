@@ -167,6 +167,21 @@ export default function App() {
       {product?.images?.[0]&&<meta property="og:image" content={product.images[0]}/>}
       <meta name="theme-color" content="#fbf8f2"/>
       <meta property="og:title" content={`${title} | ${siteText(siteData.homepage,'seo.brand')}`} />
+      <script type="application/ld+json">{JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'ClothingStore',
+        name: 'Nomaan Brothers',
+        description: 'Bespoke menswear and kidswear occasionwear showroom in Mandi Bazar, Warangal.',
+        address: {
+          '@type': 'PostalAddress',
+          streetAddress: 'Mandi Bazar',
+          addressLocality: 'Warangal',
+          addressRegion: 'Telangana',
+          addressCountry: 'IN',
+        },
+        ...(siteData.homepage.contactPhone ? { telephone: siteData.homepage.contactPhone } : {}),
+        ...(typeof window !== 'undefined' ? { url: window.location.origin } : {}),
+      })}</script>
     </Helmet>
     <V2Header path={path} home={siteData.homepage} categories={siteData.categories} onNavigate={navigate}/>
     <main id="main-content" className="min-h-[40vh]">

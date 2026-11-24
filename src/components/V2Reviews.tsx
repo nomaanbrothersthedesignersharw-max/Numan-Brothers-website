@@ -10,6 +10,12 @@ export default function V2Reviews(){
  const [website,setWebsite]=useState(''),[status,setStatus]=useState(''),[busy,setBusy]=useState(false);
  const [lightboxPhoto,setLightboxPhoto]=useState<string|null>(null);
  useEffect(()=>{
+   if(!lightboxPhoto)return;
+   const onKey=(e:KeyboardEvent)=>{if(e.key === 'Escape')setLightboxPhoto(null);};
+   window.addEventListener('keydown',onKey);
+   return()=>window.removeEventListener('keydown',onKey);
+ },[lightboxPhoto]);
+ useEffect(()=>{
    let active=true;
    const load=async()=>{
      try{

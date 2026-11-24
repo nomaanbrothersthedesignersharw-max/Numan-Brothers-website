@@ -42,6 +42,29 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
   const [revPhotos, setRevPhotos] = useState<{ dataUrl: string; sizeBytes: number; name: string }[]>([]);
   const [revPhotoCompressing, setRevPhotoCompressing] = useState(false);
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
+  useEffect(() => {
+    if (!zoomOpen && !lightboxPhoto) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setLightboxPhoto(null);
+        setZoomOpen(false);
+      } else if (zoomOpen && images.length > 1 && e.key === 'ArrowRight') {
+        setSelectedImage((c) => (c + 1) % images.length);
+      } else if (zoomOpen && images.length > 1 && e.key === 'ArrowLeft') {
+        setSelectedImage((c) => (c + images.length - 1) % images.length);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoomOpen, lightboxPhoto, images.length]);
+  useEffect(() => {
+    if (images.length <= 1 || typeof Image === 'undefined') return;
+    const nextUrl = images[(selectedImage + 1) % images.length];
+    if (!nextUrl) return;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = optimizedImageUrl(nextUrl, 1200, 82);
+  }, [selectedImage, images]);
   const shortlist = useShortlist();
   const isSaved = shortlist.some((item) => item.id === garment.id);
   useEffect(() => {

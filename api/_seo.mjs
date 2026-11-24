@@ -32,9 +32,29 @@ export function renderProductHtml(template,product,canonical=null){
     ...(canonicalUrl?{url:canonicalUrl}:{}),
     ...(Number(product.offer_price??product.price)>0?{offers:{
       '@type':'Offer',priceCurrency:'INR',price:Number(product.offer_price??product.price),
+      availability:'https://schema.org/InStock',
+      itemCondition:'https://schema.org/NewCondition',
       ...(canonicalUrl?{url:canonicalUrl}:{}),
     }}:{}),
+    ...(Number(product.review_count)>0 && Number(product.rating_value)>0?{aggregateRating:{
+      '@type':'AggregateRating',
+      ratingValue:Number(Number(product.rating_value).toFixed(1)),
+      reviewCount:Math.floor(Number(product.review_count)),
+      bestRating:5,
+      worstRating:1,
+    }}:{}),
   };
+  const deptPath=product.department==='kids'?'/kids':'/men';
+  const deptLabel=product.department==='kids'?'Kids Wear':"Men's Wear";
+  const breadcrumb=canonical?{
+    '@context':'https://schema.org',
+    '@type':'BreadcrumbList',
+    itemListElement:[
+      {'@type':'ListItem',position:1,name:'Home',item:canonical+'/'},
+      {'@type':'ListItem',position:2,name:deptLabel,item:canonical+deptPath},
+      {'@type':'ListItem',position:3,name:product.title,item:canonicalUrl},
+    ],
+  }:null;
   const tags=[
     '<title>'+title+'</title>',
     '<meta name="description" content="'+desc+'"/>',
@@ -44,6 +64,7 @@ export function renderProductHtml(template,product,canonical=null){
     ...(photo?['<meta property="og:image" content="'+photo+'"/>']:[]),
     ...(canonicalUrl?['<link rel="canonical" href="'+escapeHtml(canonicalUrl)+'"/>']:[]),
     '<script type="application/ld+json">'+JSON.stringify(schema).replace(/</g,'\\u003c')+'</script>',
+    ...(breadcrumb?['<script type="application/ld+json">'+JSON.stringify(breadcrumb).replace(/</g,'\\u003c')+'</script>']:[]),
   ].join('\n');
   const article='<article class="seo-product" style="max-width:1040px;margin:3rem auto;padding:0 1.5rem">'+
     '<p>Nomaan Brothers — '+escapeHtml(product.department==='kids'?'Kids Wear':"Men's Wear")+'</p>'+
