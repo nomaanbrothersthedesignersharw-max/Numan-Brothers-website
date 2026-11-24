@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {ImagePlus,CheckCircle2,Upload,Archive,Trash2,RotateCcw} from 'lucide-react';
 import {COLLECTION_ROUTES} from '../../storefront/navigation';
 import { type CmsMediaRow, mediaPublicUrl } from '../../lib/cmsData';
-import { uploadCmsFilesParallel } from '../../lib/cmsUpload';
+import { deduplicateUploadBatch, uploadCmsFilesParallel } from '../../lib/cmsUpload';
 import { ErrorText, inputClass, invokeMediaAction, outlineClass, permanentlyDeleteMedia, primaryClass } from './StudioShared';
 
 interface Props { client: SupabaseClient; userId:string; canPublish:boolean; onMediaChange:()=>void; }
@@ -65,11 +65,17 @@ export default function CmsMedia({client,userId,canPublish,onMediaChange}:Props)
     setUploading(true);setError(null);
     try {
       setProgress(0);
-      await uploadCmsFilesParallel(client, Array.from(selection), userId, setProgress, {
-        department: uploadDept || null,
-        categoryPath: uploadCategory || null,
-        concurrency: 3,
-      });
+      const { unique, duplicateNames } = await deduplicateUploadBatch(Array.from(selection));
+      if (unique.length) {
+        await uploadCmsFilesParallel(client, unique, userId, setProgress, {
+          department: uploadDept || null,
+          categoryPath: uploadCategory || null,
+          concurrency: 3,
+        });
+      }
+      if (duplicateNames.length) {
+        setError(`Skipped ${duplicateNames.length} exact duplicate file(s): ${duplicateNames.slice(0, 3).join(', ')}${duplicateNames.length > 3 ? '…' : ''}`);
+      }
       setSelection(null);setProgress(0);
       await refresh();
       onMediaChange();

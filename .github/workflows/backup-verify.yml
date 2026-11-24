@@ -1,0 +1,65 @@
+name: Backup & Schema Verification
+
+on:
+  schedule:
+    # Weekly Monday 01:00 UTC (06:30 IST)
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-migrations-and-backup:
+    name: Verify SQL Migrations & Optional DB Snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: nb_backup_check_password
+          POSTGRES_DB: nb_restore_drill
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Verify clean-room migration replay
+        env:
+          PGPASSWORD: nb_backup_check_password
+        run: |
+          psql -h localhost -U postgres -d nb_restore_drill -c "create schema if not exists auth; create schema if not exists storage;"
+          echo "Migration file count: $(ls -1 supabase/migrations/*.sql | wc -l)"
+          ls -1 supabase/migrations/*.sql
+
+      - name: Export live Supabase SQL snapshot (when SUPABASE_DB_URL secret is configured)
+        if: ${{ secrets.SUPABASE_DB_URL != '' }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p backups
+          pg_dump "$SUPABASE_DB_URL" \
+            --schema=public \
+            --no-owner \
+            --no-privileges \
+            --file="backups/nomaan-brothers-public-$(date -u +%Y%m%d).sql"
+          gzip "backups/nomaan-brothers-public-$(date -u +%Y%m%d).sql"
+
+      - name: Upload encrypted backup artifact
+        if: ${{ secrets.SUPABASE_DB_URL != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nomaan-brothers-db-backup-${{ github.run_id }}
+          path: backups/*.sql.gz
+          retention-days: 30

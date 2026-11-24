@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ArrowLeft, ArrowRight, Plus, Save, Send, Archive, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Download, Plus, Save, Send, Archive, Trash2 } from 'lucide-react';
 import { type CmsProductRow, isSafeHttps } from '../../lib/cmsData';
+import { buildCatalogueCsv, clearLocalDraft, loadLocalDraft, saveLocalDraft } from '../../lib/draftRecovery';
 import { COLLECTION_ROUTES } from '../../storefront/navigation';
 import { productPath } from '../../storefront/catalog';
 import AssetEditor from './AssetEditor';
@@ -85,8 +86,22 @@ export default function CmsProducts({client,userId,canPublish}:Props){
   const [departmentFilter,setDepartmentFilter]=useState('all');
   const [revisions,setRevisions]=useState<ProductRevision[]>([]);
   const [revisionsLoading,setRevisionsLoading]=useState(false);
+  const [dirty,setDirty]=useState(false);
+  const [recoverable,setRecoverable]=useState<{savedAt:number;data:Draft}|null>(null);
+  const [exportingCsv,setExportingCsv]=useState(false);
   const active=rows.find((r)=>r.id===id);
   const categories=COLLECTION_ROUTES.filter((c)=>!c.isDepartment && !c.isGroup && c.department===form.department);
+  useEffect(()=>{
+    if(!id||!dirty)return;
+    const timer=setTimeout(()=>{saveLocalDraft(`product:${id}`,form)},2000);
+    return()=>clearTimeout(timer);
+  },[id,dirty,form]);
+  useEffect(()=>{
+    if(!dirty)return;
+    const onBeforeUnload=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};
+    window.addEventListener('beforeunload',onBeforeUnload);
+    return()=>window.removeEventListener('beforeunload',onBeforeUnload);
+  },[dirty]);
   // Asset pickers query only when opened; published URLs are verified server-side.
   const load=async()=>{
     setLoading(true);setError(null);
@@ -122,7 +137,8 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     setRevisionsLoading(false);
   };
   const open=async(entry:Entry)=>{
-    setIsNew(false);setId(entry.id);setPublishedSlug(null);setError(null);setMessage(null);setBusy(true);
+    setIsNew(false);setId(entry.id);setPublishedSlug(null);setError(null);setMessage(null);setBusy(true);setDirty(false);
+    setRecoverable(null);
     setRevisions([]);void loadRevisions(entry.id);
     const [draft,published]=await Promise.all([
       client.from('nb_product_drafts').select('content').eq('product_id',entry.id).maybeSingle(),
@@ -135,11 +151,35 @@ export default function CmsProducts({client,userId,canPublish}:Props){
       setPublishedSlug(published.data?.status==='published'?String(published.data.slug||''):null);
       setForm(draft.data?fromUnknown(draft.data.content):
       published.data?fromPublished(published.data as CmsProductRow):{...blank});
+      const localSnap=loadLocalDraft<Draft>(`product:${entry.id}`);
+      if(localSnap?.data)setRecoverable({savedAt:localSnap.savedAt,data:fromUnknown(localSnap.data)});
     }
     setBusy(false);
   };
-  const update=<K extends keyof Draft>(key:K,value:Draft[K])=>setForm((current)=>({...current,[key]:value}));
-  const create=()=>{setId(crypto.randomUUID());setPublishedSlug(null);setIsNew(true);setForm({...blank});setRevisions([]);setError(null);setMessage(null)};
+  const update=<K extends keyof Draft>(key:K,value:Draft[K])=>{setDirty(true);setForm((current)=>({...current,[key]:value}));};
+  const create=()=>{setId(crypto.randomUUID());setPublishedSlug(null);setIsNew(true);setDirty(false);setRecoverable(null);setForm({...blank});setRevisions([]);setError(null);setMessage(null)};
+  const exportCatalogueCsv=async()=>{
+    if(exportingCsv)return;
+    setExportingCsv(true);setError(null);
+    try{
+      let query=client.from('nb_products')
+        .select('sku,title,department,category_paths,fabric,sizes,price,offer_price,customizable,status,slug')
+        .order('updated_at',{ascending:false}).limit(2000);
+      if(statusFilter!=='all'&&statusFilter!=='draft')query=query.eq('status',statusFilter);
+      if(departmentFilter!=='all')query=query.eq('department',departmentFilter);
+      const {data,error:qErr}=await query;
+      if(qErr)throw qErr;
+      const csv=buildCatalogueCsv((data||[]) as Parameters<typeof buildCatalogueCsv>[0]);
+      const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+      const href=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=href;a.download=`nomaan-brothers-catalogue-${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(href);
+      setMessage(`Exported ${(data||[]).length} products to CSV.`);
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'CSV export failed.');
+    }finally{setExportingCsv(false);}
+  };
   const slugify=(value:string)=>value.normalize('NFKD').toLowerCase()
     .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,110);
   const chooseCategory=async(path:string)=>{
@@ -172,6 +212,9 @@ export default function CmsProducts({client,userId,canPublish}:Props){
         product_id:id,content:form,updated_by:userId,
       },{onConflict:'product_id'});
       if(error)throw error;
+      clearLocalDraft(`product:${id}`);
+      setDirty(false);
+      setRecoverable(null);
       setMessage('Draft saved privately. This change is not visible to customers.');
       await load();return true;
     }catch(cause){setError(cause instanceof Error?cause.message:'Draft save failed.');return false}
@@ -260,8 +303,11 @@ export default function CmsProducts({client,userId,canPublish}:Props){
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><h2 className="font-serif text-3xl">Products</h2><p className="mt-2 text-sm text-stone-600">Create and edit private drafts; approved owners publish changes atomically.</p></div>
       <div className="flex flex-wrap gap-2">
-<button type="button" className={primaryClass} onClick={create}><Plus size={16}/> New product</button>
-       </div>
+        <button type="button" className={outlineClass} disabled={exportingCsv} onClick={()=>void exportCatalogueCsv()}>
+          <Download size={16}/> {exportingCsv?'Exporting…':'Export CSV'}
+        </button>
+        <button type="button" className={primaryClass} onClick={create}><Plus size={16}/> New product</button>
+      </div>
     </div>
     <div className="nb-responsive-grid grid gap-3 rounded-lg border border-stone-200 bg-white p-3 min-[360px]:p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,auto)]">
       <input className={inputClass} type="search" aria-label="Search products by name or SKU"
@@ -303,6 +349,13 @@ export default function CmsProducts({client,userId,canPublish}:Props){
         </div>:<div className="space-y-6">
           <button type="button" className="flex items-center gap-2 text-xs text-stone-600" onClick={()=>setId(null)}><ArrowLeft size={14}/> Back to product list</button>
           <h3 className="font-serif text-2xl">{active?.label||'New product draft'}</h3>
+          {recoverable && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950">
+            <span>Unsaved local changes from {new Date(recoverable.savedAt).toLocaleString()} were found in this browser.</span>
+            <div className="flex gap-2">
+              <button type="button" className={primaryClass} onClick={()=>{setForm(recoverable.data);setDirty(true);setRecoverable(null);setMessage('Restored unsaved local changes.');}}>Restore changes</button>
+              <button type="button" className={outlineClass} onClick={()=>{if(id)clearLocalDraft(`product:${id}`);setRecoverable(null);}}>Dismiss</button>
+            </div>
+          </div>}
           <p className="text-xs text-stone-600">{publishedSlug?'This product is live. Edit any fields below, then select Update published product. Customers see only the new published version.':'Save a private draft, then publish when the product and photos are ready.'}</p>
            <p className="break-all text-xs text-stone-500">Internal record ID: {id}</p>
           {publishedSlug&&id&&<a href={productPath({id,slug:publishedSlug})} target="_blank" rel="noopener noreferrer"

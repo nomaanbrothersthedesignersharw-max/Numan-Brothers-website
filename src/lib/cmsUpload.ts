@@ -209,6 +209,43 @@ export async function runBoundedPool<T, R>(
 }
 
 /**
+ * Computes a lowercase hex SHA-256 digest for a File/Blob using Web Crypto.
+ * Falls back to size+name+lastModified fingerprint in environments without crypto.subtle.
+ */
+export async function computeFileSha256(file: Pick<File, 'arrayBuffer' | 'size' | 'name' | 'lastModified'>): Promise<string> {
+  if (typeof crypto !== 'undefined' && crypto.subtle && typeof file.arrayBuffer === 'function') {
+    const buf = await file.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+  return `fallback:${file.size}:${file.name}:${file.lastModified}`;
+}
+
+/**
+ * Deduplicates an upload batch by SHA-256 content hash so identical photographs
+ * are never uploaded twice to Supabase Storage.
+ */
+export async function deduplicateUploadBatch<T extends Pick<File, 'arrayBuffer' | 'size' | 'name' | 'lastModified'>>(
+  files: readonly T[],
+): Promise<{ unique: T[]; duplicateNames: string[] }> {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  const duplicateNames: string[] = [];
+  for (const file of files) {
+    const hash = await computeFileSha256(file);
+    if (seen.has(hash)) {
+      duplicateNames.push(file.name);
+    } else {
+      seen.add(hash);
+      unique.push(file);
+    }
+  }
+  return { unique, duplicateNames };
+}
+
+/**
  * Uploads multiple media files concurrently (default concurrency = 3) with transient retry
  * and aggregated overall progress (0-100%).
  */
