@@ -44,17 +44,9 @@ export default function V2Reviews(){
    const subComment = comment.trim();
    const subRating = rating;
    setBusy(true); setStatus('');
-   const applyLive = () => {
-     const newRev: Review = {
-       id: 'rev-' + Date.now(),
-       display_name: subName,
-       rating: subRating,
-       comment: subComment,
-       created_at: new Date().toISOString(),
-     };
-     setRows((prev) => [newRev, ...prev.filter((r) => r.comment !== subComment)]);
+   const onSubmitted = () => {
      setName(''); setComment(''); setRating(5);
-     setStatus('Submitted for moderation. Your verified review is queued for public display.');
+     setStatus('Submitted for moderation. Your review is not yet public until approved by the showroom.');
    };
    try{
      const res=await fetch('/api/submit-review',{
@@ -69,7 +61,7 @@ export default function V2Reviews(){
          setStatus(res.status===409||data.code==='23505'?'This review has already been submitted.':(data.error||'Unable to submit. Please try again.'));
          return;
        }
-       applyLive();
+       onSubmitted();
        return;
      }
    }catch{/* Fall back to direct Supabase only when /api/submit-review is absent in local vite dev */}
@@ -78,7 +70,7 @@ export default function V2Reviews(){
    });
    setBusy(false);
    if(error)setStatus(error.code==='23505'?'This review has already been submitted.':'Unable to submit. Please try again.');
-   else{ applyLive(); }
+   else{ onSubmitted(); }
  };
  return <section id="customer-reviews" aria-labelledby="nb-reviews-title"
    className="border-t border-[#d6c5ae] bg-[#f0e6d8] px-5 py-20 md:px-12 md:py-28 lg:px-20">

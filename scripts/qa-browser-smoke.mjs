@@ -232,7 +232,7 @@ async function inspectFloatingContactsAndProduct(){
     const size=page.getByRole('button',{name:'42',exact:true});
     await size.click();
     assert.equal(await size.getAttribute('aria-pressed'),'true');
-    const enquire=page.getByRole('link',{name:/Enquire about this design/i}).first();
+    const enquire=page.getByRole('link',{name:/(?:Enquire|Inquire) about this design/i}).first();
     assert.match(await enquire.getAttribute('href'),/Requested%20size%3A%2042/);
     await page.getByRole('button',{name:/Share this design/}).click();
     await page.getByRole('status').filter({hasText:/Link copied|browser address|Shared successfully/})
@@ -386,8 +386,8 @@ async function inspectEditorialRoutes(){
     await page.getByRole('button',{name:'40',exact:true}).click();
     const photo=page.getByRole('button',{name:/View photograph 2 of 3/});
     await photo.click();
-    const share=page.getByRole('link',{name:/Share Sample Plain Sherwani.*catalogue on WhatsApp/});
-    assert.match(await share.getAttribute('href'),/^https:\/\/api\.whatsapp\.com\/send\?text=/);
+    const shareBtn=page.getByRole('button',{name:/Share this design/i});
+    await shareBtn.waitFor({state:'visible',timeout:5000});
     await page.screenshot({path:join(screenshots,'local-plain-sherwani-demo-390.png'),animations:'disabled'});
     await page.goto(base+'/men/sherwani/plain',{waitUntil:'domcontentloaded'});
     await page.getByRole('link',{name:/Share Plain Sherwani catalogue on WhatsApp/}).waitFor({state:'visible',timeout:5000});

@@ -155,22 +155,9 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
     const subRating = revRating;
     const subPhotos = revPhotos.map((p) => p.dataUrl);
     setRevBusy(true); setRevStatus('');
-    const applyLiveReview = () => {
-      const newRev = {
-        id: 'rev-' + Date.now(),
-        display_name: subName,
-        rating: subRating,
-        comment: subComment,
-        created_at: new Date().toISOString(),
-        photo_urls: subPhotos,
-      };
-      setReviews((prev) => [newRev, ...prev.filter((r) => r.comment !== subComment)]);
-      setAvgRating(() => {
-        const all = [newRev, ...reviews.filter((r) => r.comment !== subComment)];
-        return Number((all.reduce((s, r) => s + r.rating, 0) / all.length).toFixed(1));
-      });
+    const onSubmitted = () => {
       setRevName(''); setRevComment(''); setRevRating(5); setRevPhotos([]);
-      setRevStatus('Thank you! Your verified star review has been published.');
+      setRevStatus('Submitted for moderation. Your star review will appear publicly once approved by the showroom.');
     };
     try {
       const res = await fetch('/api/submit-review', {
@@ -192,7 +179,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
           setRevStatus(res.status === 409 || d.code === '23505' ? 'This review has already been submitted.' : (d.error || 'Unable to submit.'));
           return;
         }
-        applyLiveReview();
+        onSubmitted();
         return;
       }
     } catch {/**/}
@@ -204,7 +191,7 @@ export default function V2Product({ product, whatsappNumber, contactPhone, home,
     });
     setRevBusy(false);
     if (error) setRevStatus(error.code === '23505' ? 'This review has already been submitted.' : 'Unable to submit. Please try again.');
-    else { applyLiveReview(); }
+    else { onSubmitted(); }
   };
   const call = callingContact(contactPhone);
   const original=garment.originalPrice??null;
