@@ -2,8 +2,8 @@
  * Edge-cached public catalogue query endpoint with PostgREST filter safety.
  * Uses Prefer: count=planned for high-concurrency scalability.
  */
-const url = process.env.VITE_SUPABASE_URL?.trim() || 'https://uinhybkdzevpxnugtvzf.supabase.co';
-const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || 'sb_publishable_h3Bat2XRHgWACqz-kxCdww_NZsSjO_q';
+import { getSupabaseConfig, logApiEvent } from './_supabase';
+
 const PAGE_SIZE = 24;
 const productCols =
   'id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,price,offer_price,customizable,status,sort_rank,created_at,updated_at';
@@ -22,12 +22,15 @@ export default {
       'Content-Type': 'application/json; charset=utf-8',
       'X-Content-Type-Options': 'nosniff',
     };
-    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || !/^sb_publishable_[A-Za-z0-9_-]{12,}$/.test(key)) {
+    const cfg = getSupabaseConfig();
+    if (!cfg) {
+      logApiEvent('error', 'catalogue_unconfigured');
       return new Response(JSON.stringify({ error: 'CMS not configured' }), {
         status: 503,
         headers: { ...headers, 'Cache-Control': 'no-store' },
       });
     }
+    const { url, key } = cfg;
 
     const sp = new URL(request.url).searchParams;
     const route = sp.get('route')?.trim() || '';

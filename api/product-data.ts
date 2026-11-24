@@ -2,8 +2,8 @@
  * Edge-cached single-product + related-products JSON endpoint.
  * Serves 1,000–2,000+ concurrent product page views from Vercel's CDN.
  */
-const url = process.env.VITE_SUPABASE_URL?.trim() || 'https://uinhybkdzevpxnugtvzf.supabase.co';
-const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || 'sb_publishable_h3Bat2XRHgWACqz-kxCdww_NZsSjO_q';
+import { getSupabaseConfig, logApiEvent } from './_supabase';
+
 const baseCols =
   'id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,price,offer_price,customizable,status,sort_rank,created_at,updated_at';
 
@@ -29,12 +29,15 @@ export default {
         headers: { ...headers, 'Cache-Control': 'public, s-maxage=30' },
       });
     }
-    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || !/^sb_publishable_[A-Za-z0-9_-]{12,}$/.test(key)) {
+    const cfg = getSupabaseConfig();
+    if (!cfg) {
+      logApiEvent('error', 'product_data_unconfigured');
       return new Response(JSON.stringify({ error: 'CMS not configured' }), {
         status: 503,
         headers: { ...headers, 'Cache-Control': 'no-store' },
       });
     }
+    const { url, key } = cfg;
 
     const supaHeaders = { apikey: key, Accept: 'application/json' };
     const col = isUuid(handle) ? 'id' : isSku(handle) ? 'sku' : 'slug';

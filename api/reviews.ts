@@ -1,8 +1,8 @@
 /**
  * Edge-cached public approved reviews endpoint (store-wide or per-product).
  */
-const url = process.env.VITE_SUPABASE_URL?.trim() || 'https://uinhybkdzevpxnugtvzf.supabase.co';
-const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || 'sb_publishable_h3Bat2XRHgWACqz-kxCdww_NZsSjO_q';
+import { getSupabaseConfig, logApiEvent } from './_supabase';
+
 const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const NOIR_SHERWANI_ID = '788f30aa-6d01-43a8-a345-9ae15074cc3e';
 
@@ -25,12 +25,15 @@ export default {
       'Content-Type': 'application/json; charset=utf-8',
       'X-Content-Type-Options': 'nosniff',
     };
-    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || !/^sb_publishable_[A-Za-z0-9_-]{12,}$/.test(key)) {
+    const cfg = getSupabaseConfig();
+    if (!cfg) {
+      logApiEvent('error', 'reviews_unconfigured');
       return new Response(JSON.stringify({ error: 'CMS not configured' }), {
         status: 503,
         headers: { ...headers, 'Cache-Control': 'no-store' },
       });
     }
+    const { url, key } = cfg;
 
     const productId = new URL(request.url).searchParams.get('productId')?.trim() || '';
     if (productId && !isUuid(productId)) {

@@ -2,8 +2,8 @@
  * Edge-cached paginated product videos endpoint supporting 100-200+ videos per product
  * via public.nb_product_videos without bloating core product payloads.
  */
-const url = process.env.VITE_SUPABASE_URL?.trim() || 'https://uinhybkdzevpxnugtvzf.supabase.co';
-const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || 'sb_publishable_h3Bat2XRHgWACqz-kxCdww_NZsSjO_q';
+import { getSupabaseConfig, logApiEvent } from './_supabase';
+
 const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 const DEFAULT_PAGE_SIZE = 12;
 const MAX_PAGE_SIZE = 24;
@@ -18,12 +18,15 @@ export default {
       'Content-Type': 'application/json; charset=utf-8',
       'X-Content-Type-Options': 'nosniff',
     };
-    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || !/^sb_publishable_[A-Za-z0-9_-]{12,}$/.test(key)) {
+    const cfg = getSupabaseConfig();
+    if (!cfg) {
+      logApiEvent('error', 'product_videos_unconfigured');
       return new Response(JSON.stringify({ error: 'CMS not configured' }), {
         status: 503,
         headers: { ...headers, 'Cache-Control': 'no-store' },
       });
     }
+    const { url, key } = cfg;
 
     const sp = new URL(request.url).searchParams;
     const productId = sp.get('productId')?.trim() || '';

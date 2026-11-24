@@ -2,8 +2,7 @@
  * Edge-cached public homepage & category bootstrap endpoint.
  * Absorbs 1,000–2,000+ concurrent visitors at Vercel's CDN instead of hitting Supabase Postgres.
  */
-const url = process.env.VITE_SUPABASE_URL?.trim() || 'https://uinhybkdzevpxnugtvzf.supabase.co';
-const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || 'sb_publishable_h3Bat2XRHgWACqz-kxCdww_NZsSjO_q';
+import { getSupabaseConfig, logApiEvent } from './_supabase';
 
 const productCols =
   'id,sku,slug,title,department,category_paths,description,fabric,sizes,image_urls,video_url,price,offer_price,customizable,status,sort_rank,created_at,updated_at';
@@ -18,12 +17,15 @@ export default {
       'Content-Type': 'application/json; charset=utf-8',
       'X-Content-Type-Options': 'nosniff',
     };
-    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || !/^sb_publishable_[A-Za-z0-9_-]{12,}$/.test(key)) {
+    const cfg = getSupabaseConfig();
+    if (!cfg) {
+      logApiEvent('error', 'home_data_unconfigured');
       return new Response(JSON.stringify({ error: 'CMS not configured' }), {
         status: 503,
         headers: { ...headers, 'Cache-Control': 'no-store' },
       });
     }
+    const { url, key } = cfg;
 
     const supaHeaders = { apikey: key, Accept: 'application/json' };
     try {

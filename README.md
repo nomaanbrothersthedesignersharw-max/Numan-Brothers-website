@@ -4,9 +4,9 @@ A mobile-first, browse-and-enquire catalogue for the traditional menswear and ki
 
 ## Live services
 
-- Customer storefront: https://numan-brothers-website.vercel.app/
-- Staff CMS: https://numan-brothers-cms-showroom.vercel.app/studio
-- GitHub: https://github.com/helloalifstudio-coder/Numan-Brothers-website
+- Customer storefront: configured via `SITE_CANONICAL_URL` (Vercel) and `vars.PROD_BASE_URL` (GitHub Actions)
+- Staff CMS: `<PROD_BASE_URL>/studio` (or `vars.STUDIO_BASE_URL` when split)
+- GitHub: https://github.com/nomaanbrothersthedesignersharw-max/Numan-Brothers-website
 - Data: dedicated Nomaan Brothers Supabase project, with Auth, RLS, PostgreSQL and approved media storage.
 
 **What is live vs pending:** A responsive public website and Studio are deployed. Some content cannot be completed without client approval: real photos and brand film, verified social links, approved privacy/return/terms statements and actual garments. Decorative sample artwork is illustrative; the Plain Sherwani demo is labeled **NOT FOR SALE**, not database stock. Payments, POS and accurate inventory are outside this catalogue's scope.

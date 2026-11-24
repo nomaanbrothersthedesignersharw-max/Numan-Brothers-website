@@ -2,6 +2,8 @@
  * Rate-limited, bot-protected public review submission endpoint.
  * Prevents direct unthrottled spam against the Supabase REST API.
  */
+import { getSupabaseConfig, logApiEvent } from './_supabase';
+
 const buckets = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 10 * 60 * 1000;
 const MAX_PER_WINDOW = 5;
@@ -43,11 +45,12 @@ export default {
       return new Response(JSON.stringify({ error: 'Too many submissions. Please try again later.' }), { status: 429, headers });
     }
 
-    const api = process.env.VITE_SUPABASE_URL?.trim() || 'https://uinhybkdzevpxnugtvzf.supabase.co';
-    const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim() || 'sb_publishable_h3Bat2XRHgWACqz-kxCdww_NZsSjO_q';
-    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(api) || !/^sb_publishable_[A-Za-z0-9_-]{12,}$/.test(key)) {
+    const cfg = getSupabaseConfig();
+    if (!cfg) {
+      logApiEvent('error', 'submit_review_unconfigured');
       return new Response(JSON.stringify({ error: 'Review service unavailable.' }), { status: 503, headers });
     }
+    const { url: api, key } = cfg;
 
     let body: Record<string, unknown>;
     try {
