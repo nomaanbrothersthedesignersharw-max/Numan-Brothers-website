@@ -17,9 +17,7 @@ export function prefetchRoute(href: string) {
     const handle = cleanPath.slice('/products/'.length);
     void import('../components/V2Product');
     void loadProductById(handle);
-  } else if (cleanPath === '/' || cleanPath === '/contact') {
-    void import('../components/V2Home');
-  } else if (cleanPath !== '/search' && !cleanPath.startsWith('/studio')) {
+  } else if (cleanPath !== '/' && cleanPath !== '/contact' && cleanPath !== '/search' && !cleanPath.startsWith('/studio')) {
     void import('../components/V2Collection');
     void loadCataloguePage({ route: cleanPath });
   }

@@ -28,7 +28,6 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             'vendor-react': ['react', 'react-dom', 'react-helmet-async'],
             'vendor-supabase': ['@supabase/supabase-js'],
-            'vendor-motion': ['motion'],
           },
         },
       },

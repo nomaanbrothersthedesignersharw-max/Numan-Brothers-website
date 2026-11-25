@@ -1,6 +1,5 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {ArrowDownRight,ArrowRight,ArrowUpRight,MapPin,MoveDownRight,MessageCircle,Phone,Scissors,Ruler} from 'lucide-react';
-import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react';
 import { Product } from '../types';
 import { optimizedImageUrl, type CmsHome, type CmsCategoryRow } from '../lib/cmsData';
 import {siteText,homeSectionStyle,featuredCardStyle} from '../lib/siteContent';
@@ -25,15 +24,47 @@ export default function V2Home({ products, home, categories=[], onNavigate }: Pr
     '?text='+encodeURIComponent('Hello Nomaan Brothers, I would like to discuss customized sherwani tailoring, fabric choices and measurements.'):null;
   const photoTwo = home.storyImage || home.menImage;
   const hero = useRef<HTMLElement>(null);
-  const reduce = useReducedMotion();
+  const heroBgRef = useRef<HTMLImageElement>(null);
+  const heroTextRef = useRef<HTMLDivElement>(null);
+  const scrollHintRef = useRef<HTMLDivElement>(null);
+  const [reduce, setReduce] = useState(false);
   const [introCycle,setIntroCycle]=useState(0);
   const [introActive,setIntroActive]=useState(true);
   const onIntroComplete=useCallback(()=>setIntroActive(false),[]);
   const replayFilm=()=>{setIntroActive(true);setIntroCycle(n=>n+1);};
-  const { scrollYProgress } = useScroll({ target: hero, offset: ['start start', 'end start'] });
-  const imageY = useTransform(scrollYProgress, [0, 1], [0, 72]);
-  const textY = useTransform(scrollYProgress, [0, 1], [0, -35]);
-  const scrollLine = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prefersReduced = Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+    setReduce(prefersReduced);
+    if (prefersReduced) return;
+
+    let raf = 0;
+    const applyParallax = () => {
+      raf = 0;
+      const el = hero.current;
+      if (!el) return;
+      const height = Math.max(1, el.offsetHeight);
+      const progress = Math.min(1, Math.max(0, window.scrollY / height));
+      if (heroBgRef.current) {
+        heroBgRef.current.style.transform = `translate3d(0, ${(progress * 64).toFixed(1)}px, 0) scale(1.10)`;
+      }
+      if (heroTextRef.current) {
+        heroTextRef.current.style.transform = `translate3d(0, ${(-progress * 30).toFixed(1)}px, 0)`;
+      }
+      if (scrollHintRef.current) {
+        scrollHintRef.current.style.opacity = String(Math.max(0, 1 - progress / 0.6));
+      }
+    };
+    const onScroll = () => {
+      if (!raf) raf = window.requestAnimationFrame(applyParallax);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, []);
   const getImage = (route: string, fallback = '') =>
     productImage(productsForCollection(products, route)[0] || {} as Product) || fallback;
 
@@ -51,17 +82,15 @@ export default function V2Home({ products, home, categories=[], onNavigate }: Pr
     <section ref={hero} data-nb-contact-hero style={homeSectionStyle(home,'hero')} className="relative isolate min-h-[620px] overflow-hidden bg-[#211b17] text-[#fff8ed] md:min-h-[730px] lg:min-h-[min(860px,calc(100svh-106px))]" aria-labelledby="v2-home-title">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_28%_35%,#5d4939_0,transparent_56%)]" />
       <div className="absolute inset-y-0 right-0 w-[100%] md:w-[65%] lg:w-[57%]">
-           {photo && <motion.img src={optimizedImageUrl(photo, 1600, 85)} alt="" fetchPriority="high" loading="eager" decoding="async"
-             className="h-full w-full scale-[1.10] object-cover object-center opacity-[.60] md:opacity-90"
-             style={reduce ? undefined : { y: imageY }} />}
+           {photo && <img ref={heroBgRef} src={optimizedImageUrl(photo, 1600, 85)} alt="" fetchPriority="high" loading="eager" decoding="async"
+             className="h-full w-full scale-[1.10] object-cover object-center opacity-[.60] md:opacity-90" />}
          </div>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#211b17] via-[#211b17]/90 to-[#211b17]/30 md:via-[#211b17]/75 md:to-transparent" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#211b17]/70 via-transparent to-[#211b17]/10" />
       <div data-testid="main-hero" inert={introActive&&!reduce}
         className="relative mx-auto grid min-h-[620px] max-w-[1440px] grid-cols-1 items-center gap-8 px-4 pb-24 pt-16 min-[360px]:px-5 sm:px-6 sm:pt-20 md:min-h-[730px] md:px-12 lg:min-h-[min(860px,calc(100svh-106px))] lg:grid-cols-[minmax(0,1.1fr)_minmax(0,.9fr)] lg:gap-8 lg:px-20 xl:gap-14">
-        <motion.div style={reduce ? undefined : { y: textY }} className="relative z-10 min-w-0 max-w-[660px]">
-          <motion.div initial={reduce ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: .7, ease: [0.22,1,0.36,1] }}>
+        <div ref={heroTextRef} className="relative z-10 min-w-0 max-w-[660px]">
+          <div className="motion-safe:animate-[nb-hero-enter_560ms_cubic-bezier(0.22,1,0.36,1)_both]">
             <div className="mb-8 flex min-w-0 items-center gap-3 break-words text-[10px] font-semibold uppercase tracking-[.19em] text-[#e9c797] min-[360px]:gap-4 min-[360px]:tracking-[.26em]">
               <span className="h-px w-10 bg-[#cba777]"/> {home.heroEyebrow}
             </div>
@@ -93,8 +122,8 @@ export default function V2Home({ products, home, categories=[], onNavigate }: Pr
                 Replay brand film <ArrowUpRight size={14}/>
               </button>}
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
         <div className="relative z-10 w-full min-w-0 lg:justify-self-end" aria-label="Editorial collection artwork">
           <div className="group nb-hero-editorial-frame relative mx-auto aspect-[16/10] max-h-[330px] w-full max-w-[530px] overflow-hidden rounded-[1.55rem] border border-[#e5c69d]/50 bg-[#31271e] shadow-[0_28px_90px_-30px_rgba(0,0,0,.72)] sm:aspect-[5/4] lg:mx-0 lg:aspect-[4/5] lg:max-h-[570px]">
             <img src={photo||'/editorial/sherwani.svg'}
@@ -118,10 +147,9 @@ export default function V2Home({ products, home, categories=[], onNavigate }: Pr
             </div>
           </div>
         </div>
-         <motion.div className="absolute bottom-8 left-6 flex items-center gap-3 text-[10px] font-medium uppercase tracking-[.22em] text-white/75 md:left-12 lg:left-20"
-          style={reduce ? undefined : { opacity: scrollLine }}>
+         <div ref={scrollHintRef} className="absolute bottom-8 left-6 flex items-center gap-3 text-[10px] font-medium uppercase tracking-[.22em] text-white/75 md:left-12 lg:left-20">
           <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/40"><MoveDownRight size={14}/></span> {siteText(home,'home.scroll')}
-        </motion.div>
+        </div>
         <div className="absolute bottom-9 right-7 hidden border-l border-white/40 pl-5 text-[10px] uppercase tracking-[.24em] text-[#e3d6c4] lg:block">
           Nomaan Brothers · Warangal
         </div>

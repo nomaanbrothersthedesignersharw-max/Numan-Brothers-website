@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion, useScroll } from 'motion/react';
 import { ArrowRight, ChevronDown, MapPin, Menu, Search, X } from 'lucide-react';
 import { DEPARTMENTS, DepartmentId, getDepartment } from '../storefront/navigation';
 import { loadCataloguePage } from '../lib/catalogQueries';
@@ -25,9 +24,30 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
   const [keyword, setKeyword] = useState('');
   const [liveResults, setLiveResults] = useState<CatalogProduct[]>([]);
   const [liveLoading, setLiveLoading] = useState(false);
-  const reducedMotion = useReducedMotion();
   const wrapper = useRef<HTMLElement>(null);
-  const { scrollYProgress } = useScroll();
+  const progressBar = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const bar = progressBar.current;
+      if (!bar) return;
+      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      const ratio = Math.min(1, Math.max(0, window.scrollY / max));
+      bar.style.transform = `scaleX(${ratio})`;
+    };
+    const onScroll = () => {
+      if (!raf) raf = window.requestAnimationFrame(update);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (raf) window.cancelAnimationFrame(raf);
+    };
+  }, []);
 
   const closeAll = () => { setOpen(null); setMobile(false); setSearchOpen(false); };
   const go = (target: string) => { closeAll(); onNavigate(target); };
@@ -132,15 +152,17 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
           </V2Link>
         </div>
       </div>
-      <motion.div className="absolute bottom-0 left-0 h-[2px] w-full origin-left bg-[#af8754]"
-        style={reducedMotion ? undefined : { scaleX: scrollYProgress }} aria-hidden="true" />
-      <AnimatePresence>
-        {open && (
-          <motion.div id={'department-' + open}
-            initial={reducedMotion ? false : { opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.22 }}
-            className="absolute left-0 top-full hidden w-full border-t border-[#e9dfd1] bg-[#fbf8f2] shadow-[0_26px_55px_-25px_rgba(25,20,16,.3)] lg:block">
+      <div
+        ref={progressBar}
+        className="absolute bottom-0 left-0 h-[2px] w-full origin-left bg-[#af8754]"
+        style={{ transform: 'scaleX(0)' }}
+        aria-hidden="true"
+      />
+      {open && (
+        <div
+          id={'department-' + open}
+          className="absolute left-0 top-full hidden w-full border-t border-[#e9dfd1] bg-[#fbf8f2] shadow-[0_26px_55px_-25px_rgba(25,20,16,.3)] motion-safe:animate-[nb-fade-down_180ms_ease-out_both] lg:block"
+        >
             <div className="nb-responsive-grid mx-auto grid max-w-[1380px] grid-cols-[minmax(0,230px)_minmax(0,1fr)] gap-6 px-8 py-10 xl:gap-10 xl:px-12 xl:py-11">
               <div className="border-r border-[#e5d7c4] pr-9">
                 <span className="text-[10px] font-semibold uppercase tracking-[.25em] text-[#a38053]">{siteText(home,'nav.discover')}</span>
@@ -175,18 +197,14 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
                 ))}
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
     </header>
 
-    <AnimatePresence>
-      {mobile && (
-        <motion.div className="fixed inset-0 z-[70] lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <button aria-label="Close navigation" onClick={closeAll} className="absolute inset-0 h-full w-full bg-black/50" />
-          <motion.div role="dialog" aria-modal="true" aria-label="Browse collections" className="absolute inset-y-0 left-0 flex w-[min(92vw,420px)] flex-col overflow-y-auto overscroll-contain bg-[#fbf8f2] px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))] shadow-2xl sm:px-5"
-            initial={reducedMotion ? false : { x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}>
+    {mobile && (
+      <div className="fixed inset-0 z-[70] lg:hidden">
+        <button aria-label="Close navigation" onClick={closeAll} className="absolute inset-0 h-full w-full bg-black/50 motion-safe:animate-[nb-fade-in_180ms_ease-out_both]" />
+        <div role="dialog" aria-modal="true" aria-label="Browse collections" className="absolute inset-y-0 left-0 flex w-[min(92vw,420px)] flex-col overflow-y-auto overscroll-contain bg-[#fbf8f2] px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))] shadow-2xl motion-safe:animate-[nb-slide-right_240ms_cubic-bezier(0.22,1,0.36,1)_both] sm:px-5">
             <div className="mb-5 flex items-center justify-between border-b border-[#e7ddd0] pb-5">
               <span className="font-serif text-2xl">{siteText(home,'nav.brand')}</span>
               <button type="button" aria-label="Close menu" className="flex h-11 w-11 items-center justify-center" onClick={closeAll}><X/></button>
@@ -227,15 +245,12 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
             <V2Link href="/contact" onNavigate={go} className="mt-auto flex min-h-12 items-center gap-2 border-t border-[#e3d7c8] pt-5 text-sm font-semibold">
               <MapPin size={17}/> {siteText(home,'nav.mobileContact')}
             </V2Link>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
-    <AnimatePresence>
-      {searchOpen && (
-        <motion.div role="dialog" aria-modal="true" aria-label="Search clothing collections"
-          className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-[#16110d]/70 px-3 pt-[max(1.5rem,env(safe-area-inset-top))] backdrop-blur-sm sm:px-4 sm:pt-[12vh]"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+    {searchOpen && (
+      <div role="dialog" aria-modal="true" aria-label="Search clothing collections"
+        className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-[#16110d]/70 px-3 pt-[max(1.5rem,env(safe-area-inset-top))] backdrop-blur-sm motion-safe:animate-[nb-fade-in_180ms_ease-out_both] sm:px-4 sm:pt-[12vh]">
           <div className="max-h-[calc(100svh-2.5rem)] w-full min-w-0 max-w-2xl overflow-y-auto bg-[#fbf8f2] p-4 shadow-2xl min-[360px]:p-6 md:p-9">
             <div className="mb-7 flex min-w-0 items-center justify-between gap-3">
               <h2 className="min-w-0 break-words font-serif text-[clamp(1.5rem,6vw,1.875rem)]">{siteText(home,'nav.searchTitle')}</h2>
@@ -274,8 +289,7 @@ export default function V2Header({ path, home, categories=[] , onNavigate }: Pro
               </ul>
             )}
           </div>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
   </>;
 }
