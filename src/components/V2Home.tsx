@@ -4,13 +4,14 @@ import { motion, useReducedMotion, useScroll, useTransform } from 'motion/react'
 import { Product } from '../types';
 import { optimizedImageUrl, type CmsHome, type CmsCategoryRow } from '../lib/cmsData';
 import {siteText,homeSectionStyle,featuredCardStyle} from '../lib/siteContent';
-import { productsForCollection, productImage } from '../storefront/catalog';
+import { type CatalogProduct, productsForCollection, productImage } from '../storefront/catalog';
 import V2Link from './V2Link';
 import V2Reveal from './V2Reveal';
 import V2HomeDiscovery from './V2HomeDiscovery';
+import V2HomeShowcase from './V2HomeShowcase';
 import HeroBrandIntro from './HeroBrandIntro';
 
-interface Props {products: Product[]; home: CmsHome; categories?:CmsCategoryRow[]; onNavigate:(path:string)=>void;}
+interface Props {products: CatalogProduct[]; home: CmsHome; categories?:CmsCategoryRow[]; onNavigate:(path:string)=>void;}
 
 function SectionVideo({url,label}:{url?:string;label:string}){
   return url?<div className="mx-auto mt-10 max-w-[1050px] overflow-hidden rounded-md border border-[#a7906e]/25 bg-[#1c1714]">
@@ -70,24 +71,26 @@ export default function V2Home({ products, home, categories=[], onNavigate }: Pr
             <p className="mt-8 max-w-[465px] text-sm leading-8 text-[#e0d6c7] md:text-base">
               {home.heroSubtitle}
             </p>
-            <div className="mt-10 flex flex-wrap gap-3">
+            <div className="mt-9 flex flex-wrap gap-3">
               <V2Link href="/men" onNavigate={onNavigate} className="inline-flex min-h-12 items-center gap-4 border border-[#f1dfbd] bg-[#e9d2ad] px-7 py-3 text-[11px] font-bold uppercase tracking-[.12em] text-[#281f16] transition-colors hover:bg-[#fff1d8]">
                 {siteText(home,'home.heroMen')} <ArrowUpRight size={17}/>
               </V2Link>
               <V2Link href="/kids" onNavigate={onNavigate} className="inline-flex min-h-12 items-center gap-4 border border-white/50 px-7 py-3 text-[11px] font-semibold uppercase tracking-[.12em] text-white transition-colors hover:bg-white/10">
                 {siteText(home,'home.heroKids')} <ArrowRight size={17}/>
               </V2Link>
-              <a href="#tailoring" className="inline-flex min-h-12 items-center gap-2 border-b border-[#e9d2ad] px-4 text-[11px] font-semibold uppercase tracking-[.12em] text-[#f9e0b8]">
-                <Scissors size={16}/>{siteText(home,'home.heroTailor')}
+            </div>
+            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-semibold uppercase tracking-[.12em] text-[#e6cfa9]">
+              <a href="#tailoring" className="inline-flex min-h-10 items-center gap-2 border-b border-[#e9d2ad]/50 hover:border-[#fff1d8] hover:text-white">
+                <Scissors size={14}/>{siteText(home,'home.heroTailor')}
               </a>
               {whatsapp&&<a href={whatsapp} target="_blank" rel="noopener noreferrer"
-                className="inline-flex min-h-12 items-center gap-2 border border-white/40 px-5 text-[11px] font-semibold uppercase text-white">
-                <MessageCircle size={16}/>{siteText(home,'home.heroWhatsapp')}</a>}
-              {call&&<a href={call} className="inline-flex min-h-12 items-center gap-2 border border-white/40 px-5 text-[11px] font-semibold uppercase text-white">
-                <Phone size={16}/>{siteText(home,'home.heroPhone')}</a>}
+                className="inline-flex min-h-10 items-center gap-2 hover:text-white">
+                <MessageCircle size={14}/>{siteText(home,'home.heroWhatsapp')}</a>}
+              {call&&<a href={call} className="inline-flex min-h-10 items-center gap-2 hover:text-white">
+                <Phone size={14}/>{siteText(home,'home.heroPhone')}</a>}
               {home.sectionVideos.hero&&<button type="button" onClick={replayFilm}
-                className="inline-flex min-h-12 items-center gap-2 border-b border-[#e9d2ad] px-3 text-[11px] font-semibold uppercase tracking-[.1em] text-[#f9e0b8] transition-colors hover:text-white">
-                Replay brand film <ArrowUpRight size={16}/>
+                className="inline-flex min-h-10 items-center gap-1.5 hover:text-white">
+                Replay brand film <ArrowUpRight size={14}/>
               </button>}
             </div>
           </motion.div>
@@ -143,7 +146,9 @@ export default function V2Home({ products, home, categories=[], onNavigate }: Pr
       <SectionVideo url={home.sectionVideos.quick} label="Featured quick-links video"/>
     </nav>
 
-    <section style={homeSectionStyle(home,'departments')} className="mx-auto max-w-[1440px] px-5 pb-20 pt-24 md:px-12 md:pb-28 md:pt-32 lg:px-20" aria-labelledby="departments-title">
+    <V2HomeShowcase products={products} home={home} categories={categories} onNavigate={onNavigate}/>
+
+    <section style={homeSectionStyle(home,'departments')} className="mx-auto max-w-[1440px] px-5 pb-16 pt-16 md:px-12 md:pb-24 md:pt-24 lg:px-20" aria-labelledby="departments-title">
       <V2Reveal className="mb-10 flex flex-wrap items-end justify-between gap-4 md:mb-16">
         <div>
           <p className="mb-4 text-[10px] font-bold uppercase tracking-[.28em] text-[#a37d50]">{siteText(home,'home.departmentEyebrow')}</p>
